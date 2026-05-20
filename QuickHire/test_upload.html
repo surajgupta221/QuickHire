@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QuickHire — Test Upload</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial; background: #f0f4f8; padding: 20px; }
+        .container { max-width: 700px; margin: 0 auto; }
+        h1 { color: #1B4F9E; text-align: center; margin-bottom: 20px; }
+        .card { background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .card h3 { color: #1B4F9E; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #E8F0FC; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #333; }
+        input, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 12px; }
+        textarea { height: 100px; resize: vertical; font-family: Arial; }
+        button { width: 100%; padding: 12px; background: #1B4F9E; color: white; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #144080; }
+        button:disabled { background: #999; cursor: not-allowed; }
+        .status { padding: 10px; border-radius: 6px; margin-top: 10px; font-size: 14px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .step-num { background: #1B4F9E; color: white; border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 8px; font-size: 14px; }
+        #results { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; margin-top: 15px; font-size: 13px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+        .token-display { font-size: 12px; color: #666; word-break: break-all; margin-top: 5px; background: #f8f9fa; padding: 8px; border-radius: 4px; display: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🚀 QuickHire AI Screening Test</h1>
+
+    <!-- STEP 1: LOGIN -->
+    <div class="card">
+        <h3><span class="step-num">1</span>Login</h3>
+        <label>Email:</label>
+        <input type="email" id="email" value="suraj.gupta221@gmail.com">
+        <label>Password:</label>
+        <input type="password" id="password" value="Test@123">
+        <button id="loginBtn" onclick="login()">Login
