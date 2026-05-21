@@ -5,13 +5,14 @@ from sqlalchemy.orm import Session
 from models.user import User
 import os
 from dotenv import load_dotenv
+from config import settings
 
 # ─── Config ───────────────────────────────────
 load_dotenv()
 
-SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret-key")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
 # ─── Password Hashing ─────────────────────────
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

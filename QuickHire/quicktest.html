@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuickHire Test</title>
+<style>
+body{font-family:Arial,sans-serif;max-width:700px;margin:30px auto;padding:20px;background:#f5f7fa}
+.card{background:white;padding:20px;border-radius:10px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+h2{color:#1B4F9E;margin-bottom:15px}
+input,textarea{width:100%;padding:10px;margin-bottom:10px;border:1px solid #ddd;border-radius:5px;font-size:14px;box-sizing:border-box}
+textarea{height:80px}
+.btn{width:100%;padding:12px;border:none;border-radius:5px;font-size:15px;font-weight:bold;cursor:pointer;color:white}
+.btn-blue{background:#1B4F9E}.btn-green{background:#28a745}.btn-blue:hover{background:#144080}.btn-green:hover{background:#218838}
+.msg{padding:10px;border-radius:5px;margin-top:10px;display:none}
+.ok{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
+.err{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
+.info{background:#d1ecf1;color:#0c5460;border:1px solid #bee5eb}
+pre{background:#f8f9fa;padding:15px;border-radius:5px;overflow:auto;font-size:12px;max-height:400px;white-space:pre-wrap;word-break:break-all}
+</style>
+</head>
+<body>
+
+<h1 style="color:#1B4F9E;text-align:center">🚀 QuickHire AI Screening</h1>
+
+<!-- LOGIN -->
+<div class="card">
+  <h2>Step 1 — Login</h2>
+  <input type="email" id="em" value="suraj.gupta221@gmail.com" placeholder="Email">
+  <input type="password" id="pw" value="Test@123" placeholder="Password">
+  <button class="btn btn-blue" id="b1">Login</button>
+  <div class="msg" id="m1"></div>
+</div>
+
+<!-- JD -->
+<div class="card">
+  <h2>Step 2 — Job Description</h2>
+  <input type="text" id="jt" value="Python Backend Developer" placeholder="Job Title">
+  <input type="text" id="loc" value="Noida India" placeholder="Location">
+  <textarea id="jd">We need a Python Backend Developer with 2+ years experience in Django, FastAPI, REST APIs, PostgreSQL. Must know Git. AI/ML experience is a plus.</textarea>
+  <input type="file" id="jf" accept=".pdf,.docx,.txt" style="margin-bottom:10px">
+  <button class="btn btn-blue" id="b2">Upload JD</button>
+  <div class="msg" id="m2"></div>
+</div>
+
+<!-- RESUMES -->
+<div class="card">
+  <h2>Step 3 — Upload Resumes</h2>
+  <p style="color:#666;margin-bottom:10px">Hold <strong>Ctrl</strong> to select multiple files (max 20)</p>
+  <input type="file" id="rf" multiple accept=".pdf,.docx,.doc,.txt" style="margin-bottom:10px">
+  <div class="msg info" id="fc" style="display:none"></div>
+  <button class="btn btn-green" id="b3">🤖 Screen with AI</button>
+  <div class="msg" id="m3"></div>
+  <pre id="res" style="display:none"></pre>
+</div>
+
+<script>
+var TOKEN = null;
+var SCREENING_ID = null;
+
+// File count display
+document.getElementById('rf').onchange = function(){
+  var n = this.files.length;
+  var d = document.getElementById('fc');
+  if(n > 0){
+    d.style.display = 'block';
+    var names = [];
+    for(var i=0;i<n;i++) names.push(this.files[i].name);
+    d.textContent = n + ' file(s) selected: ' + names.join(', ');
+  }
+};
+
+// Helper
+function msg(id, text, type){
+  var el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'msg ' + type;
+  el.style.display = 'block';
+}
+
+// LOGIN
+document.getElementById('b1').onclick = function(){
+  var btn = document.getElementById('b1');
+  btn.textContent = 'Logging in...';
+  btn.disabled = true;
+  msg('m1','Connecting...','info');
+
+  var body = JSON.stringify({
+    email: document.getElementById('em').value,
+    password: document.getElementById('pw').value
+  });
+
+  fetch('http://localhost:8000/auth/login', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: body
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if(data.access_token){
+      TOKEN = data.access_token;
+      msg('m1','✅ Logged in as ' + data.user.full_name + ' | Credits: ' + data.user.screening_credits,'ok');
+      btn.textContent = '✅ Logged In';
+      btn.style.background = '#28a745';
+    } else {
+      msg('m1','❌ Failed: ' + JSON.stringify(data),'err');
+      btn.textContent = 'Login';
+      btn.disabled = false;
+    }
+  })
+  .catch(function(e){
+    msg('m1','❌ Error: ' + e.message,'err');
+    btn.textContent = 'Login';
+    btn.disabled = false;
+  });
+};
+
+// UPLOAD JD
+document.getElementById('b2').onclick = function(){
+  if(!TOKEN){ msg('m2','❌ Please login first!','err'); return; }
+
+  var btn = document.getElementById('b2');
+  btn.textContent = 'Uploading...';
+  btn.disabled = true;
+  msg('m2','Uploading JD...','info');
+
+  var fd = new FormData();
+  fd.append('token', TOKEN);
+  fd.append('job_title', document.getElementById('jt').value);
+  fd.append('location', document.getElementById('loc').value);
+
+  var jdFile = document.getElementById('jf').files[0];
+  if(jdFile){
+    fd.append('jd_file', jdFile);
+  } else {
+    fd.append('jd_text', document.getElementById('jd').value);
+  }
+
+  fetch('http://localhost:8000/screening/upload-jd', {
+    method:'POST',
+    body: fd
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if(data.screening_id){
+      SCREENING_ID = data.screening_id;
+      msg('m2','✅ JD uploaded! Screening ID: ' + data.screening_id,'ok');
+      btn.textContent = '✅ JD Uploaded (ID:' + data.screening_id + ')';
+      btn.style.background = '#28a745';
+    } else {
+      msg('m2','❌ Failed: ' + JSON.stringify(data),'err');
+      btn.textContent = 'Upload JD';
+      btn.disabled = false;
+    }
+  })
+  .catch(function(e){
+    msg('m2','❌ Error: ' + e.message,'err');
+    btn.textContent = 'Upload JD';
+    btn.disabled = false;
+  });
+};
+
+// SCREEN RESUMES
+document.getElementById('b3').onclick = function(){
+  if(!TOKEN){ msg('m3','❌ Please login first!','err'); return; }
+  if(!SCREENING_ID){ msg('m3','❌ Please upload JD first!','err'); return; }
+
+  var files = document.getElementById('rf').files;
+  if(files.length === 0){ msg('m3','❌ Please select resume files!','err'); return; }
+  if(files.length > 20){ msg('m3','❌ Maximum 20 resumes allowed!','err'); return; }
+
+  var btn = document.getElementById('b3');
+  btn.textContent = '⏳ AI Analyzing ' + files.length + ' resume(s)...';
+  btn.disabled = true;
+  msg('m3','Processing with Gemini AI... Please wait (30-60 seconds)...','info');
+
+  var fd = new FormData();
+  fd.append('token', TOKEN);
+  for(var i=0; i<files.length; i++){
+    fd.append('resumes', files[i]);
+  }
+
+  fetch('http://localhost:8000/screening/upload-resumes/' + SCREENING_ID, {
+    method:'POST',
+    body: fd
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if(data.results){
+      msg('m3','✅ Done! ' + data.total_candidates + ' candidates screened. Credits left: ' + data.credits_remaining,'ok');
+
+      var out = 'SCREENING RESULTS — ' + data.job_title + '\n';
+      out += '='.repeat(50) + '\n\n';
+      data.results.forEach(function(r){
+        out += '#' + r.rank + ' ' + r.candidate_name + '\n';
+        out += 'Score: ' + r.overall_score + '/100 | Match: ' + r.match_percentage + '%\n';
+        out += 'Recommendation: ' + r.recommendation + '\n';
+        out += 'Experience: ' + r.experience_match + '\n';
+        out += 'Skills Matched: ' + (r.skills_matched||[]).join(', ') + '\n';
+        out += 'Skills Missing: ' + (r.skills_missing||[]).join(', ') + '\n';
+        out += 'Summary: ' + r.summary + '\n';
+        out += 'Interview Q1: ' + (r.interview_questions||[''])[0] + '\n';
+        out += '-'.repeat(40) + '\n\n';
+      });
+
+      var pre = document.getElementById('res');
+      pre.style.display = 'block';
+      pre.textContent = out;
+
+      btn.textContent = '✅ Screening Complete!';
+      btn.style.background = '#1B4F9E';
+    } else {
+      msg('m3','❌ Failed: ' + JSON.stringify(data),'err');
+      btn.textContent = '🤖 Screen with AI';
+      btn.disabled = false;
+    }
+  })
+  .catch(function(e){
+    msg('m3','❌ Error: ' + e.message,'err');
+    btn.textContent = '🤖 Screen with AI';
+    btn.disabled = false;
+  });
+};
+</script>
+
+</body>
+</html>

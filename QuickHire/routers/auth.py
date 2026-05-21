@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
+from config import settings
 from schemas.user import UserRegister, UserLogin, Token, UserResponse
 from services.auth import (
     get_user_by_email, create_user,
@@ -9,6 +10,34 @@ from services.auth import (
 
 # ─── Router ───────────────────────────────────
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+# ─── Admin: Add Credits (for testing only) ────
+@router.post("/admin/add-credits", tags=["Admin"])
+def add_credits(
+    email: str,
+    credits: int,
+    admin_key: str,
+    db: Session = Depends(get_db)
+):
+    """Add credits to any account — for testing only"""
+    # Simple admin key protection
+    if admin_key != settings.ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    user = get_user_by_email(db, email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.screening_credits += credits
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "message": f"Added {credits} credits",
+        "email": email,
+        "new_balance": user.screening_credits
+    }
+
 
 # ─── Register ─────────────────────────────────
 @router.post("/register", response_model=Token)

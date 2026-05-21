@@ -1,12 +1,18 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from config import settings
 import os
 
 # ─── Database URL ─────────────────────────────
 # Using SQLite for development (zero setup!)
 # We'll switch to PostgreSQL before deployment
-DATABASE_URL = "sqlite:///./quickhire.db"
+DATABASE_URL = settings.DATABASE_URL
+
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False}
+)
 
 # ─── Create Engine ────────────────────────────
 # Engine = connection to database

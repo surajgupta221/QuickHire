@@ -44,6 +44,9 @@ async def upload_jd(
             detail="No credits left. Please upgrade your plan."
         )
 
+    user.screening_credits -= 1
+    db.commit()
+
     if jd_file and jd_file.filename:
         extracted_jd = await extract_text_from_file(jd_file)
     elif jd_text:
@@ -138,7 +141,7 @@ async def upload_resumes(
     screening.results = results
     screening.total_candidates = len(results)
     screening.status = "completed"
-    user.screening_credits -= 1
+    #user.screening_credits -= 1
     db.commit()
 
     return {
