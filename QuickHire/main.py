@@ -1,3 +1,6 @@
+import sys
+print("Python version:", sys.version)
+print("Starting QuickHire...")
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
