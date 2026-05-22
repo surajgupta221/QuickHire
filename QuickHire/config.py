@@ -1,5 +1,6 @@
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
+
 
 # Load .env file
 load_dotenv()
@@ -20,7 +21,7 @@ class Settings:
     ADMIN_KEY: str = os.getenv("ADMIN_KEY", "admin-key")
 
     # ─── Gemini AI ────────────────────────────
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "YOUR_BACKUP_KEY_HERE")
 
     # ─── Razorpay ─────────────────────────────
     RAZORPAY_KEY_ID: str = os.getenv("RAZORPAY_KEY_ID", "")

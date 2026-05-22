@@ -1,6 +1,8 @@
 .env
 __pycache__/
 *.pyc
-quickhire.db
+*.db
 venv/
 .venv/
+quickhire-frontend/node_modules/
+quickhire-frontend/dist/

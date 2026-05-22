@@ -30,7 +30,7 @@ def score_resume_against_jd(
         }
 
     prompt = f"""
-You are an expert technical recruiter. Analyze this resume against the job description.
+You are an expert technical recruiter. Analyze this resume against the job description.Score STRICTLY out of 100 (not 10). Use the full range 0-100.
 
 JOB DESCRIPTION:
 {jd_text[:2000]}
@@ -38,7 +38,13 @@ JOB DESCRIPTION:
 CANDIDATE RESUME:
 {resume_text[:2000]}
 
-Respond with ONLY a JSON object containing keys: candidate_name, overall_score, match_percentage, skills_matched, skills_missing, experience_match, education_match, strengths, weaknesses, interview_questions, recommendation, summary.
+Respond with ONLY this JSON — no other text, no markdown:
+{{
+    "candidate_name": "{candidate_name}",
+    "overall_score": <number strictly between 0-100>,
+    "match_percentage": <number strictly between 0-100>,
+    ...rest of fields
+}}
 """
 
     try:

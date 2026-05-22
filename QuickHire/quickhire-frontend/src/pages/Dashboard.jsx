@@ -32,7 +32,7 @@ export default function Dashboard() {
             🎯 Credits: <strong className="text-white">{user.screening_credits}</strong> |
             📋 Plan: <strong className="text-yellow-300 uppercase">{user.plan}</strong>
             <button onClick={() => navigate('/pricing')}
-  className="bg-yellow-500 hover:bg-yellow-900 px-4 py-2 rounded-lg text-sm font-semibold transition-all">
+  className="bg-yellow-500 hover:bg-yellow-900 px-4 py-2 rounded-lg text-sm font-bold transition-all">
   ⚡Upgrade Plan
 </button>
           </span>
