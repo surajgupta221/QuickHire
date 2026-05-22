@@ -101,30 +101,6 @@ export default function Pricing() {
         theme: {
           color: '#1B4F9E'
         },
-        method: {
-    upi: {
-      flow: 'intent'
-    }
-  },
-  config: {
-    display: {
-      preferences: {
-        show_default_blocks: true
-      },
-      blocks: {
-        upi: {
-          name: 'Pay via UPI ID',
-          instruments: [
-            {
-              method: 'upi',
-              flows: ['collect']  // collect = UPI ID input field
-            }
-          ]
-        }
-      },
-      sequence: ['block.upi']
-    }
-  },
         handler: async (response) => {
           try {
             // Step 3 — Verify payment on backend

@@ -4,6 +4,8 @@ import Dashboard from './pages/Dashboard';
 import NewScreening from './pages/NewScreening';
 import Results from './pages/Results';
 import Pricing from './pages/Pricing';
+import ResetPassword from './pages/ResetPassword';
+
 
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -21,6 +23,7 @@ function App() {
         <Route path="/new-screening" element={<PrivateRoute><NewScreening /></PrivateRoute>} />
         <Route path="/results/:id" element={<PrivateRoute><Results /></PrivateRoute>} />
         <Route path="/pricing" element={<PrivateRoute><Pricing /></PrivateRoute>} />
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     </BrowserRouter>
   );

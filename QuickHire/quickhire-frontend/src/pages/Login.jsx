@@ -1,7 +1,10 @@
+import { GoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loginUser, registerUser } from '../services/api';
+
+GOOGLE_CLIENT_ID=your-google-client-id
 
 export default function Login() {
   const navigate = useNavigate();
@@ -55,6 +58,18 @@ export default function Login() {
     }
     };
 
+    const handleGoogleSuccess = async (credentialResponse) => {
+      try {
+        const res = await axios.post(
+          `${import.meta.env.VITE_API_URL}/auth/google-login?google_token=${credentialResponse.credential}`
+        );
+        localStorage.setItem('token', res.data.access_token);
+        localStorage.setItem('user', JSON.stringify(res.data.user));
+        navigate('/dashboard');
+      } catch (err) {
+        setError('Google login failed. Please try again.');
+      }
+    };
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
@@ -105,6 +120,21 @@ export default function Login() {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
 
+          <div className="mb-4">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError('Google login failed')}
+              width="100%"
+              text="continue_with"
+              shape="rectangular"
+            />
+            <div className="flex items-center gap-3 my-4">
+              <hr className="flex-1" />
+              <span className="text-gray-400 text-sm">or</span>
+              <hr className="flex-1" />
+            </div>
+          </div>
+          
           <div className="mb-6">
             <label className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
             <input type="password" name="password" value={form.password} onChange={handleChange}
