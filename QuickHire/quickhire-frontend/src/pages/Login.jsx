@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loginUser, registerUser } from '../services/api';
@@ -7,6 +8,10 @@ export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState('');
   const [form, setForm] = useState({
     full_name: '', email: '', password: '',
     company_name: '', phone: ''
@@ -33,7 +38,22 @@ export default function Login() {
     } finally {
       setLoading(false);
     }
-  };
+    };
+
+    const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    try {
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/forgot-password?email=${forgotEmail}`
+      );
+      setForgotMessage(res.data.message);
+    } catch (err) {
+      setForgotMessage('Error: ' + (err.response?.data?.detail || 'Something went wrong'));
+    } finally {
+      setForgotLoading(false);
+    }
+    };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center p-4">
@@ -100,7 +120,15 @@ export default function Login() {
 
           <button type="submit" disabled={loading}
             className="w-full py-3 bg-blue-900 text-white rounded-lg font-bold text-lg hover:bg-blue-800 disabled:opacity-50 transition-all">
-            {loading ? '⏳ Please wait...' : isLogin ? '🚀 Login' : '✅ Create Account'}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                Connecting to server... (first load takes ~30s)
+              </span>
+            ) : isLogin ? '🚀 Login' : '✅ Create Account'}
           </button>
         </form>
 
@@ -110,6 +138,60 @@ export default function Login() {
             {isLogin ? 'Register here' : 'Login here'}
           </button>
         </p>
+
+        {/* Forgot Password Link */}
+{isLogin && !showForgot && (
+  <p className="text-center text-sm mt-4">
+    <button
+      type="button"
+      onClick={() => setShowForgot(true)}
+      className="text-blue-600 hover:underline">
+      Forgot Password?
+    </button>
+  </p>
+)}
+
+{/* Forgot Password Form */}
+{showForgot && (
+  <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+    <h3 className="font-bold text-blue-900 mb-3">Reset Password</h3>
+    {forgotMessage ? (
+      <div className="text-green-700 bg-green-50 p-3 rounded-lg text-sm">
+        ✅ {forgotMessage}
+        <button
+          onClick={() => { setShowForgot(false); setForgotMessage(''); }}
+          className="block mt-2 text-blue-600 hover:underline text-xs">
+          Back to Login
+        </button>
+      </div>
+    ) : (
+      <form onSubmit={handleForgotPassword}>
+        <input
+          type="email"
+          value={forgotEmail}
+          onChange={e => setForgotEmail(e.target.value)}
+          placeholder="Enter your email"
+          required
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        />
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={forgotLoading}
+            className="flex-1 py-2 bg-blue-900 text-white rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
+            {forgotLoading ? '⏳ Sending...' : 'Send Reset Link'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowForgot(false)}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+            Cancel
+          </button>
+        </div>
+      </form>
+    )}
+  </div>
+)}
       </div>
     </div>
   );
