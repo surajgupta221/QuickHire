@@ -1,5 +1,6 @@
 import sys
 import os
+import models
 # Force Python to find the local 'services' and 'routers' folders
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 print("Python version:", sys.version)
@@ -13,9 +14,14 @@ from models import user, screening as screening_model, payment as payment_model
 from routers import auth, screening, payment
 
 
-# Create tables
-Base.metadata.create_all(bind=engine)
-
+# Create tables with error handling
+try:
+    Base.metadata.create_all(bind=engine)
+    print("✅ All database tables created successfully!", flush=True)
+except Exception as e:
+    print(f"❌ Table creation error: {e}", flush=True)
+    import traceback
+    traceback.print_exc()
 
 # Create App
 app = FastAPI(
@@ -48,6 +54,15 @@ def test_page():
     with open("quicktest.html", "r", encoding="utf-8") as f:
         return f.read()
 
+@app.get("/init-db", tags=["Health"])
+def init_db():
+    """Force database table creation"""
+    try:
+        Base.metadata.create_all(bind=engine)
+        return {"message": "Database tables created successfully!"}
+    except Exception as e:
+        return {"error": str(e)}
+    
 # Health endpoints
 @app.get("/", tags=["Health"])
 def home():
