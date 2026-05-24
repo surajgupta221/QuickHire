@@ -7,9 +7,11 @@ cursor.execute("SELECT * FROM users")
 rows = cursor.fetchall()
 
 print("\n===== ALL USERS =====\n")
+print("total rows :: ", len(rows))
 
 for row in rows:
-    print(f"""
+  
+   print(f"""
 ID: {row[0]}
 Name: {row[1]}
 Email: {row[2]}

@@ -11,10 +11,30 @@ export default function Results() {
   const [selected, setSelected] = useState(null);
 
   useEffect(() => {
-    getResults(id, token)
-      .then(res => setData(res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    let pollInterval;
+
+    const fetchResults = async () => {
+      try {
+        const res = await getResults(id, token);
+        setData(res.data);
+
+        // If still processing keep polling
+        if (res.data.status === 'processing') {
+          pollInterval = setTimeout(fetchResults, 5000); // Poll every 5 seconds
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error(err);
+        setLoading(false);
+      }
+    };
+
+    fetchResults();
+
+    return () => {
+      if (pollInterval) clearTimeout(pollInterval);
+    };
   }, [id]);
 
   const handleExport = async () => {
@@ -52,11 +72,23 @@ export default function Results() {
     return 'bg-red-100 text-red-700';
   };
 
-  if (loading) return (
+  if (loading || data?.status === 'processing') return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <div className="text-6xl mb-4 animate-bounce">🤖</div>
-        <p className="text-xl text-gray-600 font-semibold">Loading results...</p>
+      <div className="text-center bg-white p-12 rounded-2xl shadow-lg max-w-md">
+        <div className="text-6xl mb-6 animate-bounce">🤖</div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-3">
+          AI is Analyzing Resumes
+        </h2>
+        <p className="text-gray-500 mb-6">
+          Processing {data?.total_candidates || '...'} candidates.
+          This takes 1-2 minutes.
+        </p>
+        <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+          <div className="bg-blue-600 h-2 rounded-full animate-pulse w-3/4"></div>
+        </div>
+        <p className="text-sm text-gray-400">
+          Page updates automatically every 5 seconds...
+        </p>
       </div>
     </div>
   );

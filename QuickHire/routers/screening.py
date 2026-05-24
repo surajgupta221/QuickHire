@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, BackgroundTasks, File, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from database import get_db
+from database import get_db, SessionLocal
 from models.screening import Screening
 from models.user import User
 from services.file_parser import extract_text_from_file
@@ -79,15 +79,12 @@ async def upload_jd(
 @router.post("/upload-resumes/{screening_id}")
 async def upload_resumes(
     screening_id: int,
+    background_tasks: BackgroundTasks,
     token: str = Form(...),
     resumes: List[UploadFile] = File(...),
     db: Session = Depends(get_db)
 ):
-    """
-    Upload 1 to 20 resumes at once.
-    Supported formats: PDF, Word (.docx), Text (.txt)
-    Select multiple files by holding Ctrl key.
-    """
+    """Upload resumes and process in background"""
     user = get_current_user(token, db)
 
     screening = db.query(Screening).filter(
@@ -101,18 +98,12 @@ async def upload_resumes(
     uploaded_files = [f for f in resumes if f and f.filename]
 
     if not uploaded_files:
-        raise HTTPException(
-            status_code=400,
-            detail="Please upload at least one resume"
-        )
+        raise HTTPException(status_code=400, detail="Please upload at least one resume")
 
     if len(uploaded_files) > 20:
-        raise HTTPException(
-            status_code=400,
-            detail="Maximum 20 resumes allowed per screening"
-        )
+        raise HTTPException(status_code=400, detail="Maximum 20 resumes allowed")
 
-    # Extract text from each resume
+    # Extract text immediately
     resume_data = []
     for resume_file in uploaded_files:
         try:
@@ -128,30 +119,56 @@ async def upload_resumes(
         except Exception as e:
             resume_data.append({
                 "name": resume_file.filename,
-                "text": "Could not read file",
+                "text": "",
                 "filename": resume_file.filename,
                 "error": str(e)
             })
 
+    # Set to processing immediately
     screening.status = "processing"
+    screening.total_candidates = len(resume_data)
+    user.screening_credits -= 1
     db.commit()
 
-    results = score_multiple_resumes(screening.jd_text, resume_data)
-
-    screening.results = results
-    screening.total_candidates = len(results)
-    screening.status = "completed"
-    #user.screening_credits -= 1
-    db.commit()
+    # Process AI in background
+    background_tasks.add_task(
+        process_resumes_background,
+        screening_id,
+        screening.jd_text,
+        resume_data
+    )
 
     return {
-        "message": "Screening completed!",
+        "message": "Screening started! Results will be ready in 1-2 minutes.",
         "screening_id": screening_id,
         "job_title": screening.job_title,
-        "total_candidates": len(results),
+        "total_candidates": len(resume_data),
         "credits_remaining": user.screening_credits,
-        "results": results
+        "status": "processing"
     }
+
+
+def process_resumes_background(screening_id: int, jd_text: str, resume_data: list):
+    """Process resumes in background"""
+    db = SessionLocal()
+    try:
+        results = score_multiple_resumes(jd_text, resume_data)
+
+        screening = db.query(Screening).filter(Screening.id == screening_id).first()
+        if screening:
+            screening.results = results
+            screening.total_candidates = len(results)
+            screening.status = "completed"
+            db.commit()
+            print(f"✅ Screening {screening_id} completed!", flush=True)
+    except Exception as e:
+        print(f"❌ Background screening failed: {e}", flush=True)
+        screening = db.query(Screening).filter(Screening.id == screening_id).first()
+        if screening:
+            screening.status = "failed"
+            db.commit()
+    finally:
+        db.close()
 
 # ─── Get Results ──────────────────────────────
 @router.get("/results/{screening_id}")

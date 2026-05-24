@@ -34,19 +34,50 @@ export default function NewScreening() {
     }
   };
 
+  <button onClick={handleResumeSubmit}
+  disabled={loading || files.length === 0}
+  className="flex-1 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 disabled:opacity-50 transition-all">
+  {loading ? (
+    <div className="flex flex-col items-center">
+      <div className="flex items-center gap-2 mb-1">
+        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10"
+            stroke="currentColor" strokeWidth="4" fill="none"/>
+          <path className="opacity-75" fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+        <span>AI Analyzing {files.length} resume(s)...</span>
+      </div>
+      <span className="text-xs opacity-75">
+        Takes ~{files.length * 20} seconds. Please wait...
+      </span>
+    </div>
+  ) : `🤖 Screen ${files.length} Resume(s) with AI`}
+</button>
+
   const handleResumeSubmit = async () => {
-    if (files.length === 0) { setError('Please select resume files'); return; }
+    if (!token) { setError('Please login first'); return; }
+    if (!screeningId) { setError('Please upload JD first'); return; }
+
+    const fileList = files;
+    if (fileList.length === 0) { setError('Please select resume files'); return; }
+
     setLoading(true);
     setError('');
+
     try {
       const fd = new FormData();
       fd.append('token', token);
-      files.forEach(f => fd.append('resumes', f));
-      await uploadResumes(screeningId, fd);
+      fileList.forEach(f => fd.append('resumes', f));
+
+      const res = await uploadResumes(screeningId, fd);
+
+      // Redirect immediately to results page
+      // Results page will poll until completed
       navigate(`/results/${screeningId}`);
+
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to process resumes');
-    } finally {
       setLoading(false);
     }
   };

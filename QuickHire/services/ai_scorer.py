@@ -95,8 +95,27 @@ Respond with ONLY this JSON — no other text, no markdown:
 def score_multiple_resumes(jd_text: str, resumes: list) -> list:
     """Score multiple resumes and return ranked list"""
     results = []
+
     for i, resume in enumerate(resumes):
-        print(f"Processing candidate profile evaluation {i+1}/{len(resumes)}")
+        print(f"Processing candidate profile evaluation {i+1}/{len(resumes)}", flush=True)
+
+        if not resume.get("text") or len(resume.get("text", "").strip()) < 30:
+            results.append({
+                "candidate_name": resume.get("name", "Unknown"),
+                "overall_score": 0,
+                "match_percentage": 0,
+                "skills_matched": [],
+                "skills_missing": [],
+                "experience_match": "Could not read",
+                "education_match": "Could not read",
+                "strengths": [],
+                "weaknesses": ["Resume content could not be extracted"],
+                "interview_questions": [],
+                "recommendation": "Not Recommended",
+                "summary": "Could not extract text from this resume."
+            })
+            continue
+
         score = score_resume_against_jd(
             jd_text=jd_text,
             resume_text=resume["text"],
@@ -104,8 +123,16 @@ def score_multiple_resumes(jd_text: str, resumes: list) -> list:
         )
         results.append(score)
 
+        # Small delay only if not last resume
+        if i < len(resumes) - 1:
+            time.sleep(1)  # Reduced from 4 to 1 second
+
+    # Sort by score
     results.sort(key=lambda x: x.get("overall_score", 0), reverse=True)
+
+    # Add ranks
     for i, result in enumerate(results):
         result["rank"] = i + 1
+
     return results
 
