@@ -4,8 +4,17 @@ const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
 });
 
-export const loginUser = (email, password) =>
-  API.post('/auth/login', { email, password });
+export const loginUser = (email, password) => {
+  const formData = new URLSearchParams();
+  formData.append('username', email); // FastAPI OAuth2 expects 'username'
+  formData.append('password', password);
+
+  return API.post('/auth/login', formData, {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+  });
+};
 
 export const registerUser = (data) =>
   API.post('/auth/register', data);
