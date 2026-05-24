@@ -36,9 +36,21 @@ export default function Login() {
       localStorage.setItem('token', res.data.access_token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
       navigate('/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Something went wrong');
-    } finally {
+      } catch (err) {
+        const backendDetail = err.response?.data?.detail;
+        
+        if (Array.isArray(backendDetail)) {
+          // If FastAPI sends back an array of validation errors, extract the first message string
+          setError(backendDetail[0]?.msg || 'Validation failed');
+        } else if (typeof backendDetail === 'object' && backendDetail !== null) {
+          // If it's a validation error dictionary object, extract the msg string
+          setError(backendDetail.msg || 'Object validation error');
+        } else {
+          // Fall back to a standard string error
+          setError(backendDetail || 'Something went wrong');
+        }
+      }
+      finally {
       setLoading(false);
     }
     };
