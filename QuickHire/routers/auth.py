@@ -12,7 +12,7 @@ import secrets
 from services.email_service import send_password_reset_email, send_welcome_email
 from datetime import datetime, timedelta
 from services.auth import (
-    get_user_by_email, create_user,
+    get_user_by_email, create_user,hash_password,
     verify_password, create_access_token
 )
 
@@ -113,7 +113,7 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
     return {
         "access_token": token,
         "token_type": "bearer",
-        "user": user
+        "user": UserResponse.model_validate(user)
     }
 
 # ─── Login ────────────────────────────────────
@@ -142,7 +142,7 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
     return {
         "access_token": token,
         "token_type": "bearer",
-        "user": user
+        "user": UserResponse.model_validate(user)
     }
 
 # Store reset tokens temporarily (use Redis in production)
@@ -213,4 +213,4 @@ def get_me(token: str, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    return user
+    return user 

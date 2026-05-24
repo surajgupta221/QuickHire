@@ -29,31 +29,43 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     setError('');
+
     try {
-      const res = isLogin
-        ? await loginUser(form.email, form.password)
-        : await registerUser(form);
-      localStorage.setItem('token', res.data.access_token);
-      localStorage.setItem('user', JSON.stringify(res.data.user));
-      navigate('/dashboard');
-      } catch (err) {
-        const backendDetail = err.response?.data?.detail;
-        
-        if (Array.isArray(backendDetail)) {
-          // If FastAPI sends back an array of validation errors, extract the first message string
-          setError(backendDetail[0]?.msg || 'Validation failed');
-        } else if (typeof backendDetail === 'object' && backendDetail !== null) {
-          // If it's a validation error dictionary object, extract the msg string
-          setError(backendDetail.msg || 'Object validation error');
-        } else {
-          // Fall back to a standard string error
-          setError(backendDetail || 'Something went wrong');
+      let response;
+      if (isLogin) {
+        response = await loginUser(form.email, form.password);
+      } else {
+        // Make sure all required fields are sent
+        if (!form.full_name || !form.email || !form.password) {
+          setError('Please fill all required fields');
+          setLoading(false);
+          return;
         }
+        response = await registerUser({
+          full_name: form.full_name,
+          email: form.email,
+          password: form.password,
+          company_name: form.company_name || '',
+          phone: form.phone || ''
+        });
       }
-      finally {
+
+      const { access_token, user } = response.data;
+      localStorage.setItem('token', access_token);
+      localStorage.setItem('user', JSON.stringify(user));
+      navigate('/dashboard');
+
+    } catch (err) {
+      console.error('Auth error:', err.response?.data);
+      setError(
+        err.response?.data?.detail ||
+        JSON.stringify(err.response?.data) ||
+        'Something went wrong'
+      );
+    } finally {
       setLoading(false);
     }
-    };
+  };
 
     const handleForgotPassword = async (e) => {
     e.preventDefault();
@@ -133,6 +145,7 @@ export default function Login() {
           </div>
 
           <div className="mb-4">
+            {/* Google Login - Coming Soon
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
               onError={() => setError('Google login failed')}
@@ -140,6 +153,7 @@ export default function Login() {
               text="continue_with"
               shape="rectangular"
             />
+            */}
             <div className="flex items-center gap-3 my-4">
               <hr className="flex-1" />
               <span className="text-gray-400 text-sm">or</span>
