@@ -3,15 +3,55 @@ from sqlalchemy.orm import Session
 from database import get_db
 from config import settings
 from schemas.user import UserRegister, UserLogin, Token, UserResponse
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+import os
+import sys
+import importlib.util
 import secrets
+from services.email_service import send_password_reset_email, send_welcome_email
 from datetime import datetime, timedelta
 from services.auth import (
     get_user_by_email, create_user,
     verify_password, create_access_token
 )
 
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+
 # ─── Router ───────────────────────────────────
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+@router.post("/google-login", tags=["Authentication"])
+def google_login(google_token: str, db: Session = Depends(get_db)):
+    """Login or register with Google"""
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            google_token,
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID
+        )
+
+        email = idinfo['email']
+        full_name = idinfo.get('name', email.split('@')[0])
+
+        user = get_user_by_email(db, email)
+        if not user:
+            user = create_user(
+                db=db,
+                full_name=full_name,
+                email=email,
+                password=secrets.token_urlsafe(32),
+                company_name=None,
+                phone=None
+            )
+            send_welcome_email(email, full_name)
+
+        token = create_access_token({"sub": user.email, "user_id": user.id})
+        return {"access_token": token, "token_type": "bearer", "user": user}
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Google login failed: {str(e)}")
+
 
 # ─── Admin: Add Credits (for testing only) ────
 @router.post("/admin/add-credits", tags=["Admin"])
@@ -64,6 +104,9 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
         phone=user_data.phone
     )
 
+    # Send welcome email
+    send_welcome_email(user_data.email, user_data.full_name)
+
     # Create JWT token
     token = create_access_token({"sub": user.email, "user_id": user.id})
 
@@ -104,54 +147,22 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
 
 # Store reset tokens temporarily (use Redis in production)
 reset_tokens = {}
-
 @router.post("/forgot-password", tags=["Authentication"])
 def forgot_password(email: str, db: Session = Depends(get_db)):
-    """Send password reset link"""
     user = get_user_by_email(db, email)
     if not user:
-        # Don't reveal if email exists
         return {"message": "If this email exists, a reset link has been sent"}
 
-    # Generate reset token
     token = secrets.token_urlsafe(32)
     reset_tokens[email] = {
         "token": token,
         "expires": datetime.now() + timedelta(hours=1)
     }
 
-    # In production send email — for now return token
-    print(f"Reset token for {email}: {token}")
+    # Send actual email
+    send_password_reset_email(email, token, user.full_name)
 
-    return {
-        "message": "Password reset link sent to your email",
-        "debug_token": token  # Remove in production
-    }
-
-
-@router.post("/reset-password", tags=["Authentication"])
-def reset_password(
-    email: str,
-    token: str,
-    new_password: str,
-    db: Session = Depends(get_db)
-):
-    """Reset password with token"""
-    if email not in reset_tokens:
-        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
-
-    stored = reset_tokens[email]
-
-    if stored["token"] != token:
-        raise HTTPException(status_code=400, detail="Invalid reset token")
-
-    if datetime.now() > stored["expires"]:
-        del reset_tokens[email]
-        raise HTTPException(status_code=400, detail="Reset token expired")
-    return {
-        "message": "Password reset link sent to your email",
-        "debug_token": token  # Remove in production
-    }
+    return {"message": "Password reset link sent to your email! Check your inbox."}
 
 
 @router.post("/reset-password", tags=["Authentication"])
@@ -193,7 +204,7 @@ def reset_password(
 @router.get("/me", response_model=UserResponse)
 def get_me(token: str, db: Session = Depends(get_db)):
     """Get current logged in user details"""
-    from services.auth import verify_token
+    from ..services.auth import verify_token
     payload = verify_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid token")

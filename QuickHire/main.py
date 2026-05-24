@@ -1,4 +1,7 @@
 import sys
+import os
+# Force Python to find the local 'services' and 'routers' folders
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 print("Python version:", sys.version)
 print("Starting QuickHire...")
 from fastapi import FastAPI
@@ -8,6 +11,7 @@ from database import engine, Base
 from config import settings
 from models import user, screening as screening_model, payment as payment_model
 from routers import auth, screening, payment
+
 
 # Create tables
 Base.metadata.create_all(bind=engine)

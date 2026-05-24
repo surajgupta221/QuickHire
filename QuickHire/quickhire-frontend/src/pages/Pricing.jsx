@@ -152,6 +152,11 @@ export default function Pricing() {
       };
 
       // Step 6 — Open Razorpay
+      if (!window.Razorpay) {
+        alert("Razorpay SDK failed to load. Please refresh the page or check your connection.");
+        setLoading('');
+        return;
+      }
       const rzp = new window.Razorpay(options);
 
       rzp.on('payment.failed', (response) => {

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loginUser, registerUser } from '../services/api';
 
-GOOGLE_CLIENT_ID=your-google-client-id
+//GOOGLE_CLIENT_ID=your-google-client-id
 
 export default function Login() {
   const navigate = useNavigate();

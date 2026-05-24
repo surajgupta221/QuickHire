@@ -2,9 +2,16 @@ from google import genai
 from google.genai import types
 from config import settings
 import json
+import time
 
 # Ensure your client initialization targeting settings is correct
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
+
+MODELS_TO_TRY = [
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-3-flash-preview",
+]
 
 def score_resume_against_jd(
     jd_text: str,
@@ -101,3 +108,4 @@ def score_multiple_resumes(jd_text: str, resumes: list) -> list:
     for i, result in enumerate(results):
         result["rank"] = i + 1
     return results
+
