@@ -120,14 +120,17 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 def login(credentials: UserLogin, db: Session = Depends(get_db)):
     """Login with email and password"""
-
+    print("LOGIN ATTEMPT:", credentials.email)
     # Find user
     user = get_user_by_email(db, credentials.email)
+    print("USER FOUND:", user)
     if not user:
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
         )
+    print("HASHED PASSWORD:", user.hashed_password)
+    print("INPUT PASSWORD:", credentials.password)
 
     # Check password
     if not verify_password(credentials.password, user.hashed_password):
@@ -135,7 +138,7 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
             status_code=401,
             detail="Invalid email or password"
         )
-
+    print("LOGIN SUCCESS")
     # Create token
     token = create_access_token({"sub": user.email, "user_id": user.id})
 
