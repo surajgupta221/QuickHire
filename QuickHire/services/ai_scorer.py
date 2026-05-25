@@ -1,98 +1,127 @@
 from google import genai
 from google.genai import types
+from pydantic import BaseModel, Field
+from typing import List
 from config import settings
 import json
-import time
 
+# Initialize Gemini Client
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
+
+# 1. Strict Pydantic Data Contract
+class CandidateEvaluation(BaseModel):
+    candidate_name: str
+    overall_score: int = Field(description="Integer rating between 0 and 100")
+    match_percentage: int = Field(description="Integer percentage between 0 and 100")
+    skills_matched: List[str] = Field(description="Array listing matching technical skills")
+    skills_missing: List[str] = Field(description="Array listing required job description skills missing from the resume")
+    experience_match: str
+    education_match: str
+    strengths: List[str]
+    weaknesses: List[str]
+    interview_questions: List[str]
+    recommendation: str
+    summary: str
 
 def score_resume_against_jd(
     jd_text: str,
     resume_text: str,
     candidate_name: str = "Candidate"
 ) -> dict:
-    """Score a resume against JD using Gemini AI"""
+    """Score a single resume using Gemini Structured Output models"""
 
     if not resume_text or len(resume_text.strip()) < 50:
         return {
             "candidate_name": candidate_name,
             "overall_score": 0,
             "match_percentage": 0,
-            "skills_matched": ["Could not read resume"],
-            "skills_missing": ["N/A"],
+            "skills_matched": ["Empty document data"],
+            "skills_missing": ["Empty document data"],
             "experience_match": "Poor",
             "education_match": "Poor",
-            "strengths": ["N/A"],
+            "strengths": [],
             "weaknesses": ["Could not read resume content"],
-            "interview_questions": ["Please provide a readable resume"],
+            "interview_questions": [],
             "recommendation": "Not Recommended",
-            "summary": "Resume content could not be extracted properly."
+            "summary": "Resume content could not be read properly."
         }
 
     prompt = f"""
-You are an expert technical recruiter. Analyze this resume against the job description.
-Score STRICTLY out of 100. Use the full range 0-100.
+You are an expert technical recruiter evaluating {candidate_name} against this job requirement.
+Analyze the experience, education, and technical alignment carefully.
 
 JOB DESCRIPTION:
 {jd_text[:2000]}
 
 CANDIDATE RESUME:
 {resume_text[:2000]}
-
-Return ONLY valid JSON with ALL fields populated. No markdown. No extra text:
-{{
-    "candidate_name": "{candidate_name}",
-    "overall_score": <integer 0-100>,
-    "match_percentage": <integer 0-100>,
-    "skills_matched": ["skill1", "skill2", "skill3"],
-    "skills_missing": ["missing1", "missing2"],
-    "experience_match": "Excellent",
-    "education_match": "Good",
-    "strengths": ["strength1", "strength2", "strength3"],
-    "weaknesses": ["weakness1", "weakness2"],
-    "interview_questions": [
-        "Question 1 based on experience?",
-        "Question 2 about skill gap?",
-        "Question 3 about background?"
-    ],
-    "recommendation": "Highly Recommended",
-    "summary": "2-3 sentences about this candidate fit for the role."
-}}
-
-Rules:
-- overall_score must be integer 0-100
-- skills_matched must have minimum 3 items
-- skills_missing must have minimum 2 items
-- experience_match must be: Excellent, Good, Fair, or Poor
-- education_match must be: Excellent, Good, Fair, or Poor
-- recommendation must be: Highly Recommended, Recommended, Maybe, or Not Recommended
-- summary must be minimum 2 sentences
-- ALL arrays must have at least 1 item
 """
 
     try:
+        # Enforcing structured schemas natively
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-2.5-flash", 
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
+                response_schema=CandidateEvaluation, # 👈 Enforces schema matching
                 temperature=0.2
             )
         )
-        response_text = response.text.strip()
+        return json.loads(response.text)
 
-        # Clean markdown if present
-        if "```json" in response_text:
-            response_text = response_text.split("```json")[1].split("```")[0]
-        elif "```" in response_text:
-            response_text = response_text.split("```")[1].split("```")[0]
+    except Exception as e:
+        print(f"⚠️ Gemini output block failed: {e}", flush=True)
+        # Fully populated fallback dictionary matching the exact schema definition
+        return {
+            "candidate_name": candidate_name,
+            "overall_score": 0,
+            "match_percentage": 0,
+            "skills_matched": ["Parsing failure fallback"],
+            "skills_missing": ["Parsing failure fallback"],
+            "experience_match": "Error",
+            "education_match": "Error",
+            "strengths": ["Failed to extract structural arrays"],
+            "weaknesses": ["Failed to extract structural arrays"],
+            "interview_questions": ["Could not process questions"],
+            "recommendation": "Maybe",
+            "summary": f"Evaluation extraction ran into an unexpected system crash trace: {str(e)}"
+        }
 
-        result = json.loads(response_text.strip())
+def score_multiple_resumes(jd_text: str, resumes: list) -> list:
+    """Score multiple resumes and return ranked list of candidates"""
+    results = []
 
-        # Force correct candidate name
-        result["candidate_name"] = candidate_name
+    for i, resume in enumerate(resumes):
+        print(f"Processing candidate profile evaluation {i+1}/{len(resumes)}", flush=True)
+        candidate_current_name = resume.get("name", "Unknown")
 
-        # Guarantee no empty fields
+        if not resume.get("text") or len(resume.get("text", "").strip()) < 30:
+            results.append({
+                "candidate_name": candidate_current_name,
+                "overall_score": 0,
+                "match_percentage": 0,
+                "skills_matched": ["Unreadable file layout"],
+                "skills_missing": ["Unreadable file layout"],
+                "experience_match": "Could not read",
+                "education_match": "Could not read",
+                "strengths": [],
+                "weaknesses": ["Resume content could not be extracted"],
+                "interview_questions": [],
+                "recommendation": "Not Recommended",
+                "summary": "Could not extract plain text from this document."
+            })
+            continue
+
+        result = score_resume_against_jd(
+            jd_text=jd_text,
+            resume_text=resume["text"],
+            candidate_name=candidate_current_name
+        )
+        
+        # Safe normalization assertions
+        result["candidate_name"] = candidate_current_name
+
         if not result.get("skills_matched"):
             result["skills_matched"] = ["No specific skills identified"]
         if not result.get("skills_missing"):
@@ -102,61 +131,20 @@ Rules:
         if not result.get("education_match"):
             result["education_match"] = "Fair"
         if not result.get("strengths"):
-            result["strengths"] = ["Relevant background for the role"]
+            result["strengths"] = ["Relevant background profile"]
         if not result.get("weaknesses"):
-            result["weaknesses"] = ["Further assessment needed"]
+            result["weaknesses"] = ["No major concerns found"]
         if not result.get("interview_questions"):
-            result["interview_questions"] = [
-                "Tell me about your most relevant experience?",
-                "What is your strongest technical skill?",
-                "Where do you see yourself improving?"
-            ]
+            result["interview_questions"] = ["Tell me about your technical background?"]
         if not result.get("summary"):
-            result["summary"] = f"{candidate_name} is being evaluated for this position."
+            result["summary"] = f"{candidate_current_name} evaluation complete."
 
-        return result
-
-    except Exception as e:
-        return {
-            "candidate_name": candidate_name,
-            "overall_score": 0,
-            "match_percentage": 0,
-            "skills_matched": ["Error processing resume"],
-            "skills_missing": ["Error processing resume"],
-            "experience_match": "Error",
-            "education_match": "Error",
-            "strengths": ["Could not evaluate"],
-            "weaknesses": ["AI scoring failed"],
-            "interview_questions": ["Please retry the screening"],
-            "recommendation": "Error",
-            "summary": f"AI scoring failed: {str(e)}"
-        }
-
-
-def score_multiple_resumes(jd_text: str, resumes: list) -> list:
-    """Score multiple resumes and return ranked list"""
-    results = []
-
-    for i, resume in enumerate(resumes):
-        print(f"Processing candidate {i+1}/{len(resumes)}: {resume.get('name')}", flush=True)
-
-        # Score this resume
-        result = score_resume_against_jd(
-            jd_text=jd_text,
-            resume_text=resume.get("text", ""),
-            candidate_name=resume.get("name", f"Candidate {i+1}")
-        )
         results.append(result)
 
-        # Small delay between requests
-        if i < len(resumes) - 1:
-            time.sleep(2)
-
-    # Sort by score highest first
+    # ✅ FIXED INDENTATION: Loop completes fully, then arrays are sorted and ranked
     results.sort(key=lambda x: x.get("overall_score", 0), reverse=True)
 
-    # Add rank numbers
-    for i, result in enumerate(results):
-        result["rank"] = i + 1
+    for idx, item in enumerate(results):
+        item["rank"] = idx + 1
 
     return results
