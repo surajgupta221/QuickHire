@@ -1,5 +1,7 @@
 from google import genai
 from google.genai import types
+from pydantic import BaseModel, Field
+from typing import List
 from config import settings
 import json
 import time
@@ -12,6 +14,21 @@ MODELS_TO_TRY = [
     "gemini-2.5-pro",
     "gemini-3-flash-preview",
 ]
+
+# 1. Enforce strict type structures using a Pydantic Model Schema
+class CandidateEvaluation(BaseModel):
+    candidate_name: str
+    overall_score: int = Field(description="Integer rating between 0 and 100")
+    match_percentage: int = Field(description="Integer percentage between 0 and 100")
+    skills_matched: List[str] = Field(description="Array listing at least 3 matching technical skills")
+    skills_missing: List[str] = Field(description="Array listing required job description skills missing from the resume")
+    experience_match: str
+    education_match: str
+    strengths: List[str]
+    weaknesses: List[str]
+    interview_questions: List[str]
+    recommendation: str
+    summary: str
 
 def score_resume_against_jd(
     jd_text: str,
@@ -39,19 +56,42 @@ def score_resume_against_jd(
     prompt = f"""
 You are an expert technical recruiter. Analyze this resume against the job description.Score STRICTLY out of 100 (not 10). Use the full range 0-100.
 
+IMPORTANT: You MUST return a valid JSON object with ALL fields filled. No empty arrays allowed.
+
 JOB DESCRIPTION:
 {jd_text[:2000]}
 
 CANDIDATE RESUME:
 {resume_text[:2000]}
 
-Respond with ONLY this JSON — no other text, no markdown:
+Return ONLY this JSON with ALL fields populated (no markdown, no extra text):
 {{
     "candidate_name": "{candidate_name}",
-    "overall_score": <number strictly between 0-100>,
-    "match_percentage": <number strictly between 0-100>,
-    ...rest of fields
+    "overall_score": <integer 0-100>,
+    "match_percentage": <integer 0-100>,
+    "skills_matched": ["list", "at", "least", "3", "skills", "from", "resume"],
+    "skills_missing": ["list", "skills", "in", "JD", "not", "in", "resume"],
+    "experience_match": "Excellent",
+    "education_match": "Good",
+    "strengths": ["strength 1", "strength 2", "strength 3"],
+    "weaknesses": ["weakness 1", "weakness 2"],
+    "interview_questions": [
+        "Specific question 1 based on their experience?",
+        "Specific question 2 about a skill gap?",
+        "Specific question 3 about their background?"
+    ],
+    "recommendation": "Highly Recommended",
+    "summary": "Write 2-3 sentences summarizing this candidate's fit for the role."
 }}
+
+Rules:
+- overall_score must be between 0-100
+- skills_matched must have at least 3 items if candidate has any relevant skills
+- experience_match must be one of: Excellent, Good, Fair, Poor
+- education_match must be one of: Excellent, Good, Fair, Poor  
+- recommendation must be one of: Highly Recommended, Recommended, Maybe, Not Recommended
+- summary must be at least 2 sentences
+- NEVER return empty arrays for skills_matched or skills_missing
 """
 
     try:
@@ -93,11 +133,12 @@ Respond with ONLY this JSON — no other text, no markdown:
         }
 
 def score_multiple_resumes(jd_text: str, resumes: list) -> list:
-    """Score multiple resumes and return ranked list"""
+    """Score multiple resumes and return ranked list of candidates"""
     results = []
 
     for i, resume in enumerate(resumes):
         print(f"Processing candidate profile evaluation {i+1}/{len(resumes)}", flush=True)
+        candidate_current_name = resume.get("name", "Unknown")
 
         if not resume.get("text") or len(resume.get("text", "").strip()) < 30:
             results.append({
@@ -119,13 +160,40 @@ def score_multiple_resumes(jd_text: str, resumes: list) -> list:
         score = score_resume_against_jd(
             jd_text=jd_text,
             resume_text=resume["text"],
-            candidate_name=resume["name"]
+            candidate_name=candidate_current_name
         )
-        results.append(score)
+        result["candidate_name"] = candidate_current_name
 
-        # Small delay only if not last resume
-        if i < len(resumes) - 1:
-            time.sleep(1)  # Reduced from 4 to 1 second
+        # Ensure no empty fields
+        if not result.get("skills_matched"):
+            result["skills_matched"] = ["No specific skills identified"]
+        if not result.get("skills_missing"):
+            result["skills_missing"] = ["No major gaps identified"]
+        if not result.get("experience_match"):
+            result["experience_match"] = "Fair"
+        if not result.get("education_match"):
+            result["education_match"] = "Fair"
+        if not result.get("strengths"):
+            result["strengths"] = ["Relevant matching background"]
+        if not result.get("interview_questions"):
+            result["interview_questions"] = [
+                "Tell me about your most relevant experience for this role?",
+                "What is your strongest technical skill?",
+                "Where do you see yourself improving?"
+            ]
+        if not result.get("summary"):
+            result["summary"] = f"{candidate_current_name} is a candidate being evaluated for this position."
+
+        results.append(result)
+
+        # Sort array by final evaluated values
+    results.sort(key=lambda x: x.get("overall_score", 0), reverse=True)
+
+    # Add ranks
+    for i, result in enumerate(results):
+        result["rank"] = i + 1
+
+        return results
 
     # Sort by score
     results.sort(key=lambda x: x.get("overall_score", 0), reverse=True)
@@ -135,4 +203,3 @@ def score_multiple_resumes(jd_text: str, resumes: list) -> list:
         result["rank"] = i + 1
 
     return results
-
