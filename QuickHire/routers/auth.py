@@ -9,6 +9,7 @@ import os
 import sys
 import importlib.util
 import secrets
+from services.sheets_service import add_user_to_sheet
 from services.email_service import send_password_reset_email, send_welcome_email
 from datetime import datetime, timedelta
 from services.auth import (
@@ -107,6 +108,16 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
     # Send welcome email
     send_welcome_email(user_data.email, user_data.full_name)
 
+    # Add to Google Sheets
+    add_user_to_sheet({
+        "full_name": user_data.full_name,
+        "email": user_data.email,
+        "phone": user_data.phone or "",
+        "company_name": user_data.company_name or "",
+        "plan": "free",
+        "screening_credits": 10
+    })
+    
     # Create JWT token
     token = create_access_token({"sub": user.email, "user_id": user.id})
 
