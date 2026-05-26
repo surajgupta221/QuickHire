@@ -1,36 +1,21 @@
 from google import genai
 from google.genai import types
-from groq import Groq
-
 from pydantic import BaseModel, Field
 from typing import List
-
 from config import settings
-
 import json
-import concurrent.futures
 import time
 
-# =========================
-# CLIENTS
-# =========================
+# Initialize Gemini Client
+client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
-gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
-
-groq_client = Groq(
-    api_key=settings.GROQ_API_KEY
-)
-
-# =========================
-# SCHEMA
-# =========================
-
+# 1. Strict Pydantic Data Contract
 class CandidateEvaluation(BaseModel):
     candidate_name: str
-    overall_score: int
-    match_percentage: int
-    skills_matched: List[str]
-    skills_missing: List[str]
+    overall_score: int = Field(description="Integer rating between 0 and 100")
+    match_percentage: int = Field(description="Integer percentage between 0 and 100")
+    skills_matched: List[str] = Field(description="Array listing matching technical skills")
+    skills_missing: List[str] = Field(description="Array listing required job description skills missing from the resume")
     experience_match: str
     education_match: str
     strengths: List[str]
@@ -39,220 +24,127 @@ class CandidateEvaluation(BaseModel):
     recommendation: str
     summary: str
 
+def score_resume_against_jd(
+    jd_text: str,
+    resume_text: str,
+    candidate_name: str = "Candidate"
+) -> dict:
+    """Score a single resume using Gemini Structured Output models"""
 
-# =========================
-# FALLBACK
-# =========================
+    if not resume_text or len(resume_text.strip()) < 50:
+        return {
+            "candidate_name": candidate_name,
+            "overall_score": 0,
+            "match_percentage": 0,
+            "skills_matched": ["Empty document data"],
+            "skills_missing": ["Empty document data"],
+            "experience_match": "Poor",
+            "education_match": "Poor",
+            "strengths": [],
+            "weaknesses": ["Could not read resume content"],
+            "interview_questions": [],
+            "recommendation": "Not Recommended",
+            "summary": "Resume content could not be read properly."
+        }
 
-def fallback_response(candidate_name, msg):
-    return {
-        "candidate_name": candidate_name,
-        "overall_score": 0,
-        "match_percentage": 0,
-        "skills_matched": ["Parsing failure fallback"],
-        "skills_missing": ["Parsing failure fallback"],
-        "experience_match": "Error",
-        "education_match": "Error",
-        "strengths": [],
-        "weaknesses": [msg],
-        "interview_questions": [],
-        "recommendation": "Maybe",
-        "summary": msg
-    }
+    prompt = f"""
+You are an expert technical recruiter evaluating {candidate_name} against this job requirement.
+Analyze the experience, education, and technical alignment carefully.
 
+JOB DESCRIPTION:
+{jd_text[:2000]}
 
-# =========================
-# SAFE JSON PARSER
-# =========================
+CANDIDATE RESUME:
+{resume_text[:2000]}
+"""
 
-def normalize_result(data, candidate_name):
-    data.setdefault("candidate_name", candidate_name)
-    data.setdefault("overall_score", 0)
-    data.setdefault("match_percentage", 0)
-    data.setdefault("skills_matched", [])
-    data.setdefault("skills_missing", [])
-    data.setdefault("experience_match", "Fair")
-    data.setdefault("education_match", "Fair")
-    data.setdefault("strengths", [])
-    data.setdefault("weaknesses", [])
-    data.setdefault("interview_questions", [])
-    data.setdefault("recommendation", "Maybe")
-    data.setdefault("summary", "Evaluation complete.")
-    return data
-
-
-# =========================
-# GEMINI SCORING
-# =========================
-
-def gemini_score(prompt, candidate_name):
     try:
-        response = gemini_client.models.generate_content(
-            model="gemini-2.5-flash",  # 👈 Kept standard stable model line
+        # Enforcing structured schemas natively
+        response = client.models.generate_content(
+            model="gemini-2.5-flash", 
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
-                response_schema=CandidateEvaluation,
+                response_schema=CandidateEvaluation, # 👈 Enforces schema matching
                 temperature=0.2
             )
         )
-
-        if not response.text:
-            raise Exception("Empty Gemini response")
-
-        parsed = json.loads(response.text)
-        return normalize_result(parsed, candidate_name)
+        return json.loads(response.text)
 
     except Exception as e:
-        print(f"⚠️ GEMINI FAILED FOR {candidate_name}: {e}", flush=True)
-        return None
+        print(f"⚠️ Gemini output block failed: {e}", flush=True)
+        # Fully populated fallback dictionary matching the exact schema definition
+        return {
+            "candidate_name": candidate_name,
+            "overall_score": 0,
+            "match_percentage": 0,
+            "skills_matched": ["Parsing failure fallback"],
+            "skills_missing": ["Parsing failure fallback"],
+            "experience_match": "Error",
+            "education_match": "Error",
+            "strengths": ["Failed to extract structural arrays"],
+            "weaknesses": ["Failed to extract structural arrays"],
+            "interview_questions": ["Could not process questions"],
+            "recommendation": "Maybe",
+            "summary": f"Evaluation extraction ran into an unexpected system crash trace: {str(e)}"
+        }
 
-
-# =========================
-# GROQ FALLBACK
-# =========================
-
-def groq_score(prompt, candidate_name):
-    try:
-        # Add strict key configuration rules to the payload for safety
-        groq_instruction = (
-            f"{prompt}\n\n"
-            "CRITICAL: Return ONLY a raw JSON object string matching this schema structure. "
-            "Do not include any text before or after the JSON structure.\n"
-        )
-
-        completion = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            temperature=0.1,  # Lower temperature lowers hallucinations
-            response_format={"type": "json_object"},  # 👈 FIXED: Forces Groq to output clean JSON structure
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a precise parsing assistant. Output ONLY valid JSON strings matching the exact schema keys requested."
-                },
-                {
-                    "role": "user",
-                    "content": groq_instruction
-                }
-            ]
-        )
-
-        content = completion.choices[0].message.content.strip()
-
-        # Clean markdown wrappers out safely
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.endswith("```"):
-            content = content[:-3]
-        content = content.strip()
-
-        parsed = json.loads(content)
-        return normalize_result(parsed, candidate_name)
-
-    except Exception as e:
-        print(f"❌ GROQ FALLBACK CRASHED FOR {candidate_name}: {e}", flush=True)
-        return fallback_response(candidate_name, f"Both Gemini and Groq systems exhausted. Error: {str(e)}")
-
-
-# =========================
-# MAIN SINGLE SCORING
-# =========================
-
-def score_resume_against_jd(
-    jd_text,
-    resume_text,
-    candidate_name="Candidate"
-):
-    if not resume_text or len(resume_text.strip()) < 50:
-        return fallback_response(
-            candidate_name,
-            "Resume content too small"
-        )
-
-    prompt = f"""
-You are an expert technical recruiter. Evaluate candidate against job description.
-Return STRICT JSON ONLY.
-
-Required keys:
-candidate_name
-overall_score
-match_percentage
-skills_matched
-skills_missing
-experience_match
-education_match
-strengths
-weaknesses
-interview_questions
-recommendation
-summary
-
-JOB DESCRIPTION:
-{jd_text[:3000]}
-
-RESUME:
-{resume_text[:4000]}
-"""
-
-    # 1st Try Gemini
-    gemini_result = gemini_score(prompt, candidate_name)
-    if gemini_result:
-        return gemini_result
-
-    # 2nd Try Groq if Gemini hits a 429 limit wall
-    print(f"🚀 Gemini blocked or limit hit. Routing {candidate_name} to Groq fallback layer...", flush=True)
-    return groq_score(prompt, candidate_name)
-
-
-# =========================
-# MULTI THREAD
-# =========================
-
-def process_resume(args):
-    jd_text, resume = args
-    candidate_name = resume.get("name", "Unknown")
-
-    try:
-        return score_resume_against_jd(
-            jd_text=jd_text,
-            resume_text=resume.get("text", ""),
-            candidate_name=candidate_name
-        )
-    except Exception as e:
-        return fallback_response(candidate_name, str(e))
-
-
-# =========================
-# BULK PROCESSING
-# =========================
-
-def score_multiple_resumes(
-    jd_text,
-    resumes
-):
+def score_multiple_resumes(jd_text: str, resumes: list) -> list:
+    """Score multiple resumes and return ranked list of candidates"""
     results = []
 
-    # Max workers set to 4 to balance high volume execution without flooding network sockets
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        tasks = [(jd_text, resume) for resume in resumes]
+    for i, resume in enumerate(resumes):
+        print(f"Processing candidate profile evaluation {i+1}/{len(resumes)}", flush=True)
+        candidate_current_name = resume.get("name", "Unknown")
+
+        if not resume.get("text") or len(resume.get("text", "").strip()) < 30:
+            results.append({
+                "candidate_name": candidate_current_name,
+                "overall_score": 0,
+                "match_percentage": 0,
+                "skills_matched": ["Unreadable file layout"],
+                "skills_missing": ["Unreadable file layout"],
+                "experience_match": "Could not read",
+                "education_match": "Could not read",
+                "strengths": [],
+                "weaknesses": ["Resume content could not be extracted"],
+                "interview_questions": [],
+                "recommendation": "Not Recommended",
+                "summary": "Could not extract plain text from this document."
+            })
+            continue
+
+        result = score_resume_against_jd(
+            jd_text=jd_text,
+            resume_text=resume["text"],
+            candidate_name=candidate_current_name
+        )
         
-        # Submit all tasks immediately to kick off parallel processing cluster
-        futures = {executor.submit(process_resume, task): task for task in tasks}
+        # Safe normalization assertions
+        result["candidate_name"] = candidate_current_name
 
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                result = future.result(timeout=60)
-                results.append(result)
-            except Exception as e:
-                task_data = futures[future]
-                failed_name = task_data[1].get("name", "Unknown")
-                print(f"❌ THREAD POOL WORKER ERROR for {failed_name}: {e}", flush=True)
-                results.append(fallback_response(failed_name, f"Thread timeout error: {str(e)}"))
+        if not result.get("skills_matched"):
+            result["skills_matched"] = ["No specific skills identified"]
+        if not result.get("skills_missing"):
+            result["skills_missing"] = ["No major gaps identified"]
+        if not result.get("experience_match"):
+            result["experience_match"] = "Fair"
+        if not result.get("education_match"):
+            result["education_match"] = "Fair"
+        if not result.get("strengths"):
+            result["strengths"] = ["Relevant background profile"]
+        if not result.get("weaknesses"):
+            result["weaknesses"] = ["No major concerns found"]
+        if not result.get("interview_questions"):
+            result["interview_questions"] = ["Tell me about your technical background?"]
+        if not result.get("summary"):
+            result["summary"] = f"{candidate_current_name} evaluation complete."
 
-    # SORTING BY SCORE
+        results.append(result)
+
+    # ✅ FIXED INDENTATION: Loop completes fully, then arrays are sorted and ranked
     results.sort(key=lambda x: x.get("overall_score", 0), reverse=True)
 
-    # RANKING GENERATION
     for idx, item in enumerate(results):
         item["rank"] = idx + 1
 
