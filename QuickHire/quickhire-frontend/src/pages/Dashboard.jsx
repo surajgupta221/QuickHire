@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getHistory } from '../services/api';
+import AutoLogout from '../components/AutoLogout';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -106,7 +107,7 @@ export default function Dashboard() {
             ))}
           </div>
         )}
-      </div>
+      </div> <AutoLogout />
     </div>
   );
 }

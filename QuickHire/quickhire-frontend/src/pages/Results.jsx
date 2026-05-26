@@ -268,10 +268,10 @@ export default function Results() {
                       {/* Skills Matched */}
                       <div>
                         <p className="text-sm font-bold text-gray-700 mb-2">
-                          ✅ Skills Matched ({(selected.skills_matched || []).length})
+                          ✅ Skills Matched ({(selected.skills_matched || selected.skills_match || selected.skills || []).length})
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {(selected.skills_matched || []).map((s, i) => (
+                          {(selected.skills_matched || selected.skills_match || selected.skills || []).map((s, i) => (
                             <span key={i} className="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-medium">
                               {s}
                             </span>
@@ -282,10 +282,10 @@ export default function Results() {
                       {/* Skills Missing */}
                       <div>
                         <p className="text-sm font-bold text-gray-700 mb-2">
-                          ❌ Skills Missing ({(selected.skills_missing || []).length})
+                          ❌ Skills Missing ({(selected.skills_missing || selected.skills_missed || selected.missing_skills || []).length})
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {(selected.skills_missing || []).map((s, i) => (
+                          {(selected.skills_missing || selected.skills_missed || selected.missing_skills || []).map((s, i) => (
                             <span key={i} className="bg-red-100 text-red-600 text-xs px-3 py-1 rounded-full font-medium">
                               {s}
                             </span>
