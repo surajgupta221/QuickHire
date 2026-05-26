@@ -7,10 +7,9 @@ import json
 import os
 import time
 
-# 👈 1. Safe imports: No complex SDK sub-properties that can trigger environment runtime errors
+# Robust, localized imports to safeguard production runtime environments
 try:
     from groq import Groq
-    # Initialize Groq client dynamically using your settings module or an environment fallback
     groq_api_key = getattr(settings, "GROQ_API_KEY", os.getenv("GROQ_API_KEY"))
     groq_client = Groq(api_key=groq_api_key) if groq_api_key else None
 except ImportError:
@@ -39,7 +38,7 @@ def score_resume_against_jd(
     resume_text: str,
     candidate_name: str = "Candidate"
 ) -> dict:
-    """Score a single resume using Gemini Structured Output models with automated Groq fallback"""
+    """Score a single resume using Gemini with a highly optimized Groq backoff retry loop"""
 
     if not resume_text or len(resume_text.strip()) < 50:
         return {
@@ -57,7 +56,6 @@ def score_resume_against_jd(
             "summary": "Resume content could not be read properly."
         }
 
-    # Restricting tokens safely to prevent exceeding prompt processing context limitations
     prompt = f"""
 You are an expert technical recruiter evaluating {candidate_name} against this job requirement.
 Analyze the experience, education, and technical alignment carefully.
@@ -69,8 +67,8 @@ CANDIDATE RESUME:
 {resume_text[:3000]}
 """
 
+    # 💡 Step A: Try Primary Run with Gemini Natively
     try:
-        # 1. Primary Attempt: Request parsing using Gemini
         response = client.models.generate_content(
             model="gemini-2.5-flash", 
             contents=prompt,
@@ -83,53 +81,60 @@ CANDIDATE RESUME:
         return json.loads(response.text)
 
     except Exception as gemini_error:
-        # Check if the failure is a Quota/Rate Limit (429) or structural access block
         error_msg = str(gemini_error)
-        print(f"⚠️ Gemini output block failed: {error_msg}", flush=True)
+        print(f"⚠️ Gemini processing unavailable: {error_msg}. Routing to fallback...", flush=True)
         
-        # 2. Secondary Attempt: Automated Fallback Execution using Groq Cloud Engine
+        # 💡 Step B: Execute Groq Fallback Loop with Built-In Exponential Backoff Rest Blocks
         if groq_client:
-            print(f"🚀 Activating Groq fallback engine for candidate: {candidate_name}...", flush=True)
-            try:
-                # Appending absolute instructions ensures Groq returns structure that validates against your model
-                groq_instruction = (
-                    f"{prompt}\n\n"
-                    "CRITICAL: You must respond ONLY with a raw JSON object string. "
-                    "Do not wrap it in markdown block tags like ```json. Do not add any text text before or after the JSON. "
-                    "Match these dictionary keys exactly:\n"
-                    "{\n"
-                    '  "candidate_name": "string",\n'
-                    '  "overall_score": 0,\n'
-                    '  "match_percentage": 0,\n'
-                    '  "skills_matched": ["string"],\n'
-                    '  "skills_missing": ["string"],\n'
-                    '  "experience_match": "string",\n'
-                    '  "education_match": "string",\n'
-                    '  "strengths": ["string"],\n'
-                    '  "weaknesses": ["string"],\n'
-                    '  "interview_questions": ["string"],\n'
-                    '  "recommendation": "string",\n'
-                    '  "summary": "string"\n'
-                    "}"
-                )
-                
-                completion = groq_client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[{"role": "user", "content": groq_instruction}],
-                    response_format={"type": "json_object"},
-                    temperature=0.1
-                )
-                
-                # Sanitize the output text string to protect json parser from stray symbols
-                raw_output = completion.choices.message.content.strip()
-                return json.loads(raw_output)
-                
-            except Exception as groq_error:
-                print(f"❌ Groq fallback engine also failed: {groq_error}", flush=True)
+            groq_attempts = 4
+            backoff_delay = 8.0  # Safe window starting point to completely clear free RPM walls
+            
+            for attempt in range(groq_attempts):
+                try:
+                    print(f"🚀 [Groq Attempt {attempt+1}/{groq_attempts}] Processing evaluation for: {candidate_name}...", flush=True)
+                    
+                    groq_instruction = (
+                        f"{prompt}\n\n"
+                        "CRITICAL: Return ONLY a raw JSON object string. Do not wrap it in markdown block tags like ```json. "
+                        "Do not add any prose text before or after the JSON structure. Match these schema keys exactly:\n"
+                        "{\n"
+                        '  "candidate_name": "string",\n'
+                        '  "overall_score": 0,\n'
+                        '  "match_percentage": 0,\n'
+                        '  "skills_matched": ["string"],\n'
+                        '  "skills_missing": ["string"],\n'
+                        '  "experience_match": "string",\n'
+                        '  "education_match": "string",\n'
+                        '  "strengths": ["string"],\n'
+                        '  "weaknesses": ["string"],\n'
+                        '  "interview_questions": ["string"],\n'
+                        '  "recommendation": "string",\n'
+                        '  "summary": "string"\n'
+                        "}"
+                    )
+                    
+                    completion = groq_client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[{"role": "user", "content": groq_instruction}],
+                        response_format={"type": "json_object"},
+                        temperature=0.1
+                    )
+                    
+                    raw_output = completion.choices.message.content.strip()
+                    return json.loads(raw_output)
+                    
+                except Exception as groq_error:
+                    print(f"⚠️ Groq rate ceiling limit or formatting issue hit: {groq_error}", flush=True)
+                    if attempt < groq_attempts - 1:
+                        print(f"⏳ Backing off pipeline logic... Sleeping for {backoff_delay} seconds.", flush=True)
+                        time.sleep(backoff_delay)
+                        backoff_delay *= 2.0  # Dynamic progressive backoff: 8s, 16s, 32s
+                    else:
+                        print(f"❌ All fallback computational recovery options completely exhausted for {candidate_name}.", flush=True)
         else:
-            print("⚠️ Groq client is not initialized. Skipping fallback execution.", flush=True)
+            print("⚠️ Groq API client infrastructure unavailable. Moving forward...", flush=True)
 
-        # Fully populated fallback dictionary matching the exact schema definition if all processing engines fail
+        # Resilient structural fallback recovery dictionary
         return {
             "candidate_name": candidate_name,
             "overall_score": 0,
@@ -138,15 +143,15 @@ CANDIDATE RESUME:
             "skills_missing": ["Parsing failure fallback"],
             "experience_match": "Error",
             "education_match": "Error",
-            "strengths": ["Failed to extract structural arrays"],
-            "weaknesses": ["Failed to extract structural arrays"],
-            "interview_questions": ["Could not process questions"],
+            "strengths": ["All active structural inference endpoints exhausted limits"],
+            "weaknesses": ["System reached active account quota thresholds during processing"],
+            "interview_questions": ["Could not parse sample evaluation paths"],
             "recommendation": "Maybe",
-            "summary": f"Evaluation extraction ran into an unexpected system crash trace: {error_msg}"
+            "summary": f"Evaluation engine processing failed safely. Diagnostics trace: {error_msg}"
         }
 
 def score_multiple_resumes(jd_text: str, resumes: list) -> list:
-    """Score multiple resumes and return ranked list of candidates"""
+    """Process multiple resumes sequentially while enforcing safe API pacing rules"""
     results = []
 
     for i, resume in enumerate(resumes):
@@ -176,7 +181,7 @@ def score_multiple_resumes(jd_text: str, resumes: list) -> list:
             candidate_name=candidate_current_name
         )
         
-        # Safe normalization assertions
+        # Enforce property mapping normalization guarantees
         result["candidate_name"] = candidate_current_name
 
         if not result.get("skills_matched"):
@@ -198,13 +203,13 @@ def score_multiple_resumes(jd_text: str, resumes: list) -> list:
 
         results.append(result)
 
-        # 🕒 Mandatory Rate-Limitation Safety Pacing
-        # Introduces a brief delay between iterations to respect the Requests Per Minute (RPM) thresholds
+        # 🕒 Crucial Step: Expanded Rate Limit Pacing Delay
+        # To handle 20 resumes without hitting free tier RPM blocks, we enforce a strict 6-second rest block between candidates.
         if i < len(resumes) - 1:
-            print("Pacing requests... Sleeping for 3 seconds", flush=True)
-            time.sleep(3.0)
+            print("Pacing requests to respect platform API rate limits... Sleeping for 6 seconds.", flush=True)
+            time.sleep(6.0)
 
-    # ✅ FIXED INDENTATION: Loop completes fully, then arrays are sorted and ranked
+    # Sort results sequentially by score ranking parameters
     results.sort(key=lambda x: x.get("overall_score", 0), reverse=True)
 
     for idx, item in enumerate(results):
