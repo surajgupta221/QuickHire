@@ -248,7 +248,7 @@ def reset_password(
 @router.get("/me", response_model=UserResponse)
 def get_me(token: str, db: Session = Depends(get_db)):
     """Get current logged in user details"""
-    from ..services.auth import verify_token
+    from services.auth import verify_token
     payload = verify_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid token")
