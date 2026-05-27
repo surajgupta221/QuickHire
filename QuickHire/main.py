@@ -38,8 +38,8 @@ app.add_middleware(
         "https://quick-hire-lime.vercel.app",  # Production Frontend
         "https://quick-hire-yzwt.vercel.app",  # 👈 ADD THIS: Staging Frontend
         "https://quickhire.vercel.app",
-        "*"
-    ],
+        
+    ]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
