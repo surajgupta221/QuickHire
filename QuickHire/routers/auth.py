@@ -6,8 +6,7 @@ from schemas.user import UserRegister, UserLogin, Token, UserResponse
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 import os
-import sys
-import importlib.util
+from pydantic import BaseModel
 import secrets
 from services.sheets_service import add_user_to_sheet
 from services.email_service import send_password_reset_email, send_welcome_email
@@ -127,36 +126,57 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
         "user": UserResponse.model_validate(user)
     }
 
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
 # ─── Login ────────────────────────────────────
-@router.post("/login", response_model=Token)
-def login(credentials: UserLogin, db: Session = Depends(get_db)):
+# ─── Login ────────────────────────────────────
+@router.post("/login", tags=["Authentication"])
+def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     """Login with email and password"""
-    print("LOGIN ATTEMPT:", credentials.email)
+
+    print("LOGIN ATTEMPT:", login_data.email, flush=True)
+
     # Find user
-    user = get_user_by_email(db, credentials.email)
-    print("USER FOUND:", user)
+    user = get_user_by_email(db, login_data.email)
+
     if not user:
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
         )
-    print("HASHED PASSWORD:", user.hashed_password)
-    print("INPUT PASSWORD:", credentials.password)
 
-    # Check password
-    if not verify_password(credentials.password, user.hashed_password):
+    # Verify password
+    if not verify_password(
+        login_data.password,
+        user.hashed_password
+    ):
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
         )
-    print("LOGIN SUCCESS")
-    # Create token
-    token = create_access_token({"sub": user.email, "user_id": user.id})
+
+    print("LOGIN SUCCESS", flush=True)
+
+    # Create JWT token
+    token = create_access_token({
+        "sub": user.email,
+        "user_id": user.id
+    })
 
     return {
         "access_token": token,
         "token_type": "bearer",
-        "user": UserResponse.model_validate(user)
+        "user": {
+            "id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "company_name": user.company_name,
+            "screening_credits": user.screening_credits,
+            "plan": user.plan,
+            "onboarding_complete": user.onboarding_complete
+        }
     }
 
 # Store reset tokens temporarily (use Redis in production)
