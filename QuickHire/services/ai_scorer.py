@@ -2,6 +2,7 @@ from google import genai
 from google.genai import types
 from config import settings
 import json
+import concurrent.futures
 import time
 import os
 
@@ -88,7 +89,7 @@ def _score_with_groq(prompt: str, candidate_name: str) -> dict:
         raise Exception("Groq not configured")
 
     response = groq_client.chat.completions.create(
-        model="llama3-8b-8192",
+        model="llama-3.1-8b-instant",
         messages=[
             {
                 "role": "system",
@@ -176,7 +177,7 @@ def _error_result(candidate_name: str, error: str) -> dict:
             "Check API quota and try again",
             "Contact support if issue persists"
         ],
-        "recommendation": "Error",
+        "recommendation": "Maybe",
         "summary": f"Automated evaluation could not complete for {candidate_name}. Please retry."
     }
 
@@ -193,13 +194,13 @@ def score_resume_against_jd(
 
     prompt = _build_prompt(jd_text, resume_text, candidate_name)
 
-    # ─── Try Gemini First ─────────────────────
+    # ─── Try Groq First ─────────────────────
     try:
-        result = _score_with_gemini(prompt, candidate_name)
+        result = _score_with_groq(prompt, candidate_name)
         return _validate_result(result, candidate_name)
-    except Exception as gemini_error:
-        error_str = str(gemini_error)
-        print(f"⚠️ Gemini failed for {candidate_name}: {error_str[:100]}", flush=True)
+    except Exception as groq_error:
+        error_str = str(groq_error)
+        print(f"❌ Groq also failed for {candidate_name}: {error_str[:100]}", flush=True)
 
         # Check if quota exceeded
         is_quota_error = any(x in error_str for x in [
@@ -207,47 +208,91 @@ def score_resume_against_jd(
         ])
 
         if is_quota_error:
-            print(f"🔄 Quota exceeded, trying Groq for {candidate_name}...", flush=True)
+            print(f"🔄 Quota exceeded, trying Gemini for {candidate_name}...", flush=True)
         else:
-            print(f"🔄 Gemini error, trying Groq for {candidate_name}...", flush=True)
+            print(f"🔄 Groq error, trying Gemini for {candidate_name}...", flush=True)
 
-    # ─── Fallback to Groq ─────────────────────
+    # ─── Fallback to Gemini ─────────────────────
     try:
-        result = _score_with_groq(prompt, candidate_name)
+        result = _score_with_gemini(prompt, candidate_name)
         return _validate_result(result, candidate_name)
-    except Exception as groq_error:
-        print(f"❌ Groq also failed for {candidate_name}: {str(groq_error)[:100]}", flush=True)
+    except Exception as gemini_error:
+        error_str = str(gemini_error)
+        print(f"⚠️ Gemini failed for {candidate_name}: {error_str[:100]}", flush=True)
+
 
     # ─── Both Failed ──────────────────────────
     return _error_result(candidate_name, "All AI services unavailable")
 
 
-def score_multiple_resumes(jd_text: str, resumes: list) -> list:
-    """Score all resumes and return ranked results"""
+def score_multiple_resumes(
+    jd_text: str,
+    resumes: list
+) -> list:
+    """Parallel AI screening"""
+
     results = []
 
-    for i, resume in enumerate(resumes):
-        name = resume.get("name", f"Candidate {i+1}")
-        text = resume.get("text", "")
+    # VERY IMPORTANT
+    # Keep low for free-tier APIs
 
-        print(f"Processing candidate {i+1}/{len(resumes)}: {name}", flush=True)
+    MAX_WORKERS = 2
 
-        result = score_resume_against_jd(
-            jd_text=jd_text,
-            resume_text=text,
-            candidate_name=name
+    tasks = [
+        (
+            jd_text,
+            resume,
+            idx,
+            len(resumes)
         )
-        results.append(result)
+        for idx, resume in enumerate(resumes)
+    ]
 
-        # Small delay between API calls
-        if i < len(resumes) - 1:
-            time.sleep(1)
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=MAX_WORKERS
+    ) as executor:
 
-    # Sort by score
-    results.sort(key=lambda x: x.get("overall_score", 0), reverse=True)
+        future_to_resume = {
+            executor.submit(
+                process_single_resume,
+                task
+            ): task
+            for task in tasks
+        }
 
-    # Add ranks
-    for i, r in enumerate(results):
-        r["rank"] = i + 1
+        for future in concurrent.futures.as_completed(
+            future_to_resume
+        ):
+
+            try:
+
+                result = future.result(
+                    timeout=120
+                )
+
+                results.append(result)
+
+            except Exception as e:
+
+                print(
+                    f"❌ Thread execution failed: {str(e)}",
+                    flush=True
+                )
+
+    # SORT RESULTS
+
+    results.sort(
+        key=lambda x: x.get(
+            "overall_score",
+            0
+        ),
+        reverse=True
+    )
+
+    # ADD RANKS
+
+    for idx, item in enumerate(results):
+
+        item["rank"] = idx + 1
 
     return results
