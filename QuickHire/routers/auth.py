@@ -131,7 +131,6 @@ class LoginRequest(BaseModel):
     password: str
 
 # ─── Login ────────────────────────────────────
-# ─── Login ────────────────────────────────────
 @router.post("/login", tags=["Authentication"])
 def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     """Login with email and password"""
@@ -181,6 +180,7 @@ def login(login_data: LoginRequest, db: Session = Depends(get_db)):
 
 # Store reset tokens temporarily (use Redis in production)
 reset_tokens = {}
+
 @router.post("/forgot-password", tags=["Authentication"])
 def forgot_password(email: str, db: Session = Depends(get_db)):
     user = get_user_by_email(db, email)
@@ -193,10 +193,20 @@ def forgot_password(email: str, db: Session = Depends(get_db)):
         "expires": datetime.now() + timedelta(hours=1)
     }
 
-    # Send actual email
-    send_password_reset_email(email, token, user.full_name)
+    # Try sending email
+    email_sent = send_password_reset_email(email, token, user.full_name)
 
-    return {"message": "Password reset link sent to your email! Check your inbox."}
+    # Always log token in case email fails
+    reset_url = f"https://quick-hire-lime.vercel.app/reset-password?token={token}&email={email}"
+    print(f"🔑 RESET LINK for {email}: {reset_url}", flush=True)
+
+    if email_sent:
+        return {"message": "Password reset link sent! Check your email inbox."}
+    else:
+        return {
+            "message": "Email delivery issue. Please contact support@quickhire.in or check Render logs.",
+            "note": "Reset link logged in server for manual delivery"
+        }
 
 
 @router.post("/reset-password", tags=["Authentication"])

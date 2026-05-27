@@ -45,20 +45,21 @@ def add_user_to_sheet(user_data: dict):
             first_row = sheet.row_values(1)
             if not first_row:
                 sheet.append_row([
-                    "Signup Date", "Full Name", "Email", "Phone",
+                    "Signup", "Date", "Full Name", "Email", "Phone",
                     "Company", "Plan", "Credits Left", "Status"
                 ])
         except Exception:
             pass
 
         row = [
+            "New Signup",
             datetime.now().strftime("%Y-%m-%d %H:%M"),
             user_data.get("full_name", ""),
             user_data.get("email", ""),
             user_data.get("phone", ""),
             user_data.get("company_name", ""),
             user_data.get("plan", "free"),
-            user_data.get("screening_credits", 10),
+            user_data.get("screening_credits", 3),
             "Active"
         ]
 
