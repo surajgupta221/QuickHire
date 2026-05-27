@@ -41,9 +41,11 @@ Return ONLY valid JSON. No markdown wrappers. No explanations. Just this exact J
     "skills_missing": ["List clear missing technical skills or domain alignment gaps based on the JD requirements"],
     "experience_match": "Excellent",
     "education_match": "Good",
-    "strengths": ["Identify 3 highly unique, project-specific engineering achievements found in their resume text"],
-    "weaknesses": ["Identify 2 genuine technical limitations or architectural experience gaps"],
+    "strengths": ["Identify 6 highly unique, project-specific engineering achievements found in their resume text"],
+    "weaknesses": ["Identify 3 genuine technical limitations or architectural experience gaps"],
     "interview_questions": [
+        "Create a Easy question to confirm their claimed experience with a core skill from the JD.",
+        "Create a Medium question to probe their problem-solving approach on a relevant project they mentioned.",
         "Create a tough, customized technical scenario question testing their specific claimed stack.",
         "Create a question targeting one of their identified skill gaps.",
         "Create an architectural or system design question based on their past projects."
