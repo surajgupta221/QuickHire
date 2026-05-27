@@ -21,41 +21,46 @@ except ImportError:
 
 
 def _build_prompt(jd_text: str, resume_text: str, candidate_name: str) -> str:
-    return f"""You are an expert technical recruiter. Analyze this resume against the job description.
+    return f"""You are an elite corporate technical recruiter and talent assessor. 
+Critically evaluate the candidate {candidate_name} against the provided Job Description.
+Provide deeply analytical, specific, and impactful hiring metrics.
 
 JOB DESCRIPTION:
-{jd_text[:1500]}
+{jd_text[:2000]}
 
 CANDIDATE: {candidate_name}
 RESUME:
-{resume_text[:2500]}
+{resume_text[:3500]}
 
 Return ONLY valid JSON. No markdown wrappers. No explanations. Just this exact JSON structure:
 {{
-    "candidate_name": "{candidate_name}",
-    "overall_score": 75,
-    "match_percentage": 70,
-    "skills_matched": ["Python", "FastAPI", "REST APIs"],
-    "skills_missing": ["Docker", "Kubernetes"],
-    "experience_match": "Good",
+     "candidate_name": "{candidate_name}",
+    "overall_score": 85,
+    "match_percentage": 88,
+    "skills_matched": ["List here only distinct advanced tech stacks matching the JD explicitly"],
+    "skills_missing": ["List clear missing technical skills or domain alignment gaps based on the JD requirements"],
+    "experience_match": "Excellent",
     "education_match": "Good",
-    "strengths": ["Strong Python background", "API development experience", "Good problem solving"],
-    "weaknesses": ["Limited cloud experience", "No DevOps exposure"],
+    "strengths": ["Identify 3 highly unique, project-specific engineering achievements found in their resume text"],
+    "weaknesses": ["Identify 2 genuine technical limitations or architectural experience gaps"],
     "interview_questions": [
-        "Describe your most complex Python project?",
-        "How have you handled API authentication and security?",
-        "What databases have you worked with and how did you optimize queries?"
+        "Create a tough, customized technical scenario question testing their specific claimed stack.",
+        "Create a question targeting one of their identified skill gaps.",
+        "Create an architectural or system design question based on their past projects."
     ],
-    "recommendation": "Recommended",
-    "summary": "Strong candidate with relevant Python experience matching core requirements. Minor skill gaps in cloud technologies but overall good fit for the role."
+    "recommendation": "Highly Recommended",
+    "summary": "Provide a comprehensive 3-sentence professional evaluation. Sentence 1: Core match justification. Sentence 2: Standout value proposition or project background. Sentence 3: Definitive hiring verdict for management review."
 }}
 
+Strict Rules:
+- Do not return generic phrases like 'Relevant experience'. Be hyper-specific to their resume text.
+
 Rules:
-- overall_score: integer 0-100
-- match_percentage: integer 0-100  
+- overall_score: integer 0-100, critical technical review.
+- match_percentage: integer 0-100, critical technical review.
 - experience_match: exactly one of Excellent/Good/Fair/Poor
 - education_match: exactly one of Excellent/Good/Fair/Poor
-- recommendation: exactly one of Highly Recommended/Recommended/Maybe/Not Recommended
+- recommendation: Must be exactly one of [Highly Recommended, Recommended, Maybe, Not Recommended]
 - skills_matched: minimum 3 real skills from resume
 - skills_missing: minimum 2 skills from JD not in resume
 - strengths: minimum 3 specific strengths
