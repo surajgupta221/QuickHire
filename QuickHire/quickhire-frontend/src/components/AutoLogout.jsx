@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const IDLE_TIMEOUT = 15 * 60 * 1000;      // 15 minutes
+const IDLE_TIMEOUT = 5 * 60 * 1000;      // 5 minutes
 const WARNING_BEFORE = 2 * 60 * 1000;      // warn 2 min before
 const WARNING_TIMEOUT = IDLE_TIMEOUT - WARNING_BEFORE;
 
