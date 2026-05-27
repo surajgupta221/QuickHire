@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getHistory } from '../services/api';
 import AutoLogout from '../components/AutoLogout';
+import axios from 'axios';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -11,6 +12,21 @@ export default function Dashboard() {
   const token = localStorage.getItem('token');
 
   useEffect(() => {
+    // Fetch fresh user data from server
+    const fetchUserData = async () => {
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/me`,
+          { params: { token } }
+        );
+        localStorage.setItem('user', JSON.stringify(res.data));
+      } catch (err) {
+        console.error('Could not refresh user data');
+      }
+    };
+
+    fetchUserData();
+
     getHistory(token)
       .then(res => setScreenings(res.data.screenings || []))
       .catch(console.error)

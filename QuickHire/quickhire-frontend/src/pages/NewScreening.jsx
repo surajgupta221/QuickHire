@@ -35,27 +35,6 @@ export default function NewScreening() {
     }
   };
 
-  <button onClick={handleResumeSubmit}
-  disabled={loading || files.length === 0}
-  className="flex-1 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 disabled:opacity-50 transition-all">
-  {loading ? (
-    <div className="flex flex-col items-center">
-      <div className="flex items-center gap-2 mb-1">
-        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10"
-            stroke="currentColor" strokeWidth="4" fill="none"/>
-          <path className="opacity-75" fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-        </svg>
-        <span>AI Analyzing {files.length} resume(s)...</span>
-      </div>
-      <span className="text-xs opacity-75">
-        Takes ~{files.length * 20} seconds. Please wait...
-      </span>
-    </div>
-  ) : `🤖 Screen ${files.length} Resume(s) with AI`}
-</button>
-
   const handleResumeSubmit = async () => {
     if (!token) { setError('Please login first'); return; }
     if (!screeningId) { setError('Please upload JD first'); return; }
@@ -71,27 +50,28 @@ export default function NewScreening() {
       fd.append('token', token);
       fileList.forEach(f => fd.append('resumes', f));
 
-      const res = await uploadResumes(screeningId, fd);
-
-      // Redirect immediately to results page
-      // Results page will poll until completed
+      await uploadResumes(screeningId, fd);
+      
+      // Redirect immediately to polling results screen dashboard
       navigate(`/results/${screeningId}`);
 
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to process resumes');
+    } finally {
       setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <AutoLogout />   {/* ← CORRECT POSITION */}
       <nav className="bg-blue-900 text-white px-6 py-4 flex items-center gap-4 shadow-lg">
         <button onClick={() => navigate('/dashboard')} className="hover:text-blue-200">← Back</button>
         <h1 className="text-xl font-bold">⚡ New Screening</h1>
       </nav>
 
       <div className="max-w-2xl mx-auto p-6">
-        {/* Progress */}
+        {/* Progress Grid Row */}
         <div className="flex items-center mb-8">
           {['Job Description', 'Upload Resumes', 'AI Screening'].map((s, i) => (
             <div key={i} className="flex items-center flex-1">
@@ -100,7 +80,6 @@ export default function NewScreening() {
                 step === i + 1 ? 'bg-blue-900 text-white' :
                 'bg-gray-200 text-gray-500'}`}>
                 {step > i + 1 ? '✓' : i + 1}
-                <AutoLogout />
               </div>
               <span className={`ml-2 text-sm font-medium ${step === i + 1 ? 'text-blue-900' : 'text-gray-400'}`}>
                 {s}
@@ -110,7 +89,7 @@ export default function NewScreening() {
           ))}
         </div>
 
-        {/* Step 1 - JD */}
+        {/* Step 1 - JD Workspace */}
         {step === 1 && (
           <div className="bg-white rounded-2xl p-8 shadow-sm">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">📋 Job Description</h2>
@@ -149,7 +128,7 @@ export default function NewScreening() {
           </div>
         )}
 
-        {/* Step 2 - Resumes */}
+        {/* Step 2 - Resumes Workspace */}
         {step === 2 && (
           <div className="bg-white rounded-2xl p-8 shadow-sm">
             <h2 className="text-2xl font-bold text-gray-800 mb-2">📄 Upload Resumes</h2>
@@ -180,13 +159,24 @@ export default function NewScreening() {
             {error && <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">❌ {error}</div>}
 
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setStep(1)}
-                className="flex-1 py-3 border border-gray-300 text-gray-600 rounded-lg font-semibold hover:bg-gray-50 transition-all">
+              <button onClick={() => setStep(1)} className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-bold hover:bg-gray-100 transition-all">
                 ← Back
               </button>
-              <button onClick={handleResumeSubmit} disabled={loading || files.length === 0}
-                className="flex-2 flex-1 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 disabled:opacity-50 transition-all">
-                {loading ? `⏳ AI Analyzing ${files.length} resume(s)...` : `🤖 Screen ${files.length} Resume(s) with AI`}
+              
+              <button onClick={handleResumeSubmit}
+                disabled={loading || files.length === 0}
+                className="flex-1 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 disabled:opacity-50 transition-all">
+                {loading ? (
+                  <div className="flex flex-col items-center">
+                    <div className="flex items-center gap-2 mb-1">
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                      <span>AI Analyzing {files.length} resume(s)...</span>
+                    </div>
+                  </div>
+                ) : `🤖 Screen ${files.length} Resume(s) with AI`}
               </button>
             </div>
           </div>

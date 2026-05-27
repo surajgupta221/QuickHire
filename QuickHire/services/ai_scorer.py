@@ -39,15 +39,15 @@ Return ONLY valid JSON. No markdown wrappers. No explanations. Just this exact J
     "skills_missing": ["Docker", "Kubernetes"],
     "experience_match": "Good",
     "education_match": "Good",
-    "strengths": ["Strong Python background", "API development experience"],
-    "weaknesses": ["Limited cloud experience"],
+    "strengths": ["Strong Python background", "API development experience", "Good problem solving"],
+    "weaknesses": ["Limited cloud experience", "No DevOps exposure"],
     "interview_questions": [
         "Describe your most complex Python project?",
-        "How have you handled API authentication?",
-        "What databases have you worked with?"
+        "How have you handled API authentication and security?",
+        "What databases have you worked with and how did you optimize queries?"
     ],
     "recommendation": "Recommended",
-    "summary": "Candidate matches core requirements. Minor gaps in DevOps exposure."
+    "summary": "Strong candidate with relevant Python experience matching core requirements. Minor skill gaps in cloud technologies but overall good fit for the role."
 }}
 
 Rules:
@@ -55,7 +55,12 @@ Rules:
 - match_percentage: integer 0-100  
 - experience_match: exactly one of Excellent/Good/Fair/Poor
 - education_match: exactly one of Excellent/Good/Fair/Poor
-- recommendation: exactly one of Highly Recommended/Recommended/Maybe/Not Recommended"""
+- recommendation: exactly one of Highly Recommended/Recommended/Maybe/Not Recommended
+- skills_matched: minimum 3 real skills from resume
+- skills_missing: minimum 2 skills from JD not in resume
+- strengths: minimum 3 specific strengths
+- interview_questions: exactly 3 specific questions
+- summary: minimum 2 complete sentences"""
 
 
 def _score_with_gemini(prompt: str, candidate_name: str) -> dict:
@@ -69,7 +74,14 @@ def _score_with_gemini(prompt: str, candidate_name: str) -> dict:
         )
     )
     text = response.text.strip()
-    return json.loads(text)
+    if "```json" in text:
+        text = text.split("```json")[1].split("```")[0].strip()
+    elif "```" in text:
+        text = text.split("```")[1].split("```")[0].strip()
+
+    result = json.loads(text)
+    print(f"✅ Gemini scored {candidate_name}: {result.get('overall_score')}/100", flush=True)
+    return result
 
 
 def _score_with_groq(prompt: str, candidate_name: str) -> dict:
@@ -119,13 +131,25 @@ def _validate_result(result: dict, candidate_name: str) -> dict:
     if result.get("recommendation") not in valid_rec:
         result["recommendation"] = "Maybe"
 
-    # Fill default list fields if missing
-    for field in ["skills_matched", "skills_missing", "strengths", "weaknesses", "interview_questions"]:
-        if not result.get(field) or not isinstance(result[field], list) or len(result[field]) == 0:
-            result[field] = ["Assessment pending review"]
-
+    if not result.get("skills_matched") or len(result["skills_matched"]) == 0:
+        result["skills_matched"] = ["General technical skills"]
+    if not result.get("skills_missing") or len(result["skills_missing"]) == 0:
+        result["skills_missing"] = ["Specific requirements need assessment"]
+    if not result.get("strengths") or len(result["strengths"]) == 0:
+        result["strengths"] = ["Relevant background for the role"]
+    if not result.get("weaknesses") or len(result["weaknesses"]) == 0:
+        result["weaknesses"] = ["Further evaluation recommended"]
+    if not result.get("interview_questions") or len(result["interview_questions"]) == 0:
+        result["interview_questions"] = [
+            "Tell me about your most relevant experience for this role?",
+            "What is your strongest technical skill and how have you applied it?",
+            "How do you approach learning new technologies?"
+        ]
     if not result.get("summary"):
-        result["summary"] = f"{candidate_name} has been successfully parsed and evaluated."
+        result["summary"] = (
+            f"{candidate_name} has been evaluated against the job requirements. "
+            f"Please review the detailed breakdown above."
+        )
 
     return result
 
@@ -141,10 +165,14 @@ def _error_result(candidate_name: str, error: str) -> dict:
         "experience_match": "Poor",
         "education_match": "Poor",
         "strengths": ["Please retry screening"],
-        "weaknesses": [f"Evaluation failed: {error[:60]}"],
-        "interview_questions": ["Please check your API key quota configurations and retry"],
-        "recommendation": "Maybe",
-        "summary": f"Automated structural evaluation could not complete for {candidate_name} due to system constraints."
+        "weaknesses": [f"Evaluation failed: {error[:100]}"],
+        "interview_questions": [
+            "Please retry the screening process",
+            "Check API quota and try again",
+            "Contact support if issue persists"
+        ],
+        "recommendation": "Error",
+        "summary": f"Automated evaluation could not complete for {candidate_name}. Please retry."
     }
 
 
@@ -168,6 +196,17 @@ def score_resume_against_jd(
         error_str = str(groq_error)
         print(f"❌ Groq failed for {candidate_name}: {error_str[:100]}", flush=True)
 
+        # Check if quota exceeded
+        is_quota_error = any(x in error_str for x in [
+            "429", "RESOURCE_EXHAUSTED", "quota", "rate limit"
+        ])
+
+        if is_quota_error:
+            print(f"🔄 Quota exceeded, trying Gemini for {candidate_name}...", flush=True)
+        else:
+            print(f"🔄 Groq error, trying Gemini for {candidate_name}...", flush=True)
+
+
         # ─── 2nd Try: Fallback to Gemini ─────────────────────
         print(f"🔄 Activating Gemini fallback pipeline for {candidate_name}...", flush=True)
         try:
@@ -176,7 +215,6 @@ def score_resume_against_jd(
         except Exception as gemini_error:
             print(f"⚠️ Gemini fallback also failed for {candidate_name}: {gemini_error}", flush=True)
             return _error_result(candidate_name, f"Groq: {error_str[:30]} | Gemini: {str(gemini_error)[:30]}")
-
 
 def process_single_resume(args) -> dict:
     """Worker task mapping structure for our thread pool executor"""
