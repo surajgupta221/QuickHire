@@ -35,6 +35,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "https://quick-hire-lime.vercel.app",  # Production Frontend
+        "https://quick-hire-yzwt.vercel.app",  # 👈 ADD THIS: Staging Frontend
         "https://quickhire.vercel.app",
         "*"
     ],
