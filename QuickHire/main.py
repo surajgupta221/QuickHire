@@ -5,7 +5,7 @@ import models
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 print("Python version:", sys.version)
 print("Starting QuickHire...")
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from database import engine, Base
@@ -29,6 +29,11 @@ app = FastAPI(
     description="AI-Powered Recruitment Assistant for Smart Recruiters",
     version=settings.APP_VERSION,
 )
+
+# This tells FastAPI to catch both GET and HEAD network methods cleanly
+@app.route("/health", methods=["GET", "HEAD"])
+async def health_check(request: Request):
+    return Response(content="OK", status_code=200, media_type="text/plain")
 
 # CORS
 app.add_middleware(
