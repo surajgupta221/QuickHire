@@ -12,8 +12,10 @@ gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
 # ─── Groq Client (fallback) ───────────────────
 try:
     from groq import Groq
-    groq_client = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
-    GROQ_AVAILABLE = bool(os.getenv("GROQ_API_KEY"))
+    # Fallback checking both config settings object parameters and raw OS environments
+    groq_key = getattr(settings, "GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
+    groq_client = Groq(api_key=groq_key)
+    GROQ_AVAILABLE = bool(groq_key)
 except ImportError:
     groq_client = None
     GROQ_AVAILABLE = False
@@ -23,13 +25,13 @@ def _build_prompt(jd_text: str, resume_text: str, candidate_name: str) -> str:
     return f"""You are an expert technical recruiter. Analyze this resume against the job description.
 
 JOB DESCRIPTION:
-{jd_text[:1500]}
+{jd_text[:2500]}
 
 CANDIDATE: {candidate_name}
 RESUME:
-{resume_text[:1500]}
+{resume_text[:3500]}
 
-Return ONLY valid JSON. No markdown. No explanation. Just this exact JSON structure:
+Return ONLY valid JSON. No markdown wrappers. No explanation text block. Just this exact JSON schema:
 {{
     "candidate_name": "{candidate_name}",
     "overall_score": 75,
@@ -84,22 +86,23 @@ def _score_with_gemini(prompt: str, candidate_name: str) -> dict:
 
 
 def _score_with_groq(prompt: str, candidate_name: str) -> dict:
-    """Score using Groq AI as fallback"""
+    """Score using Groq AI as primary/secondary engine"""
     if not groq_client or not GROQ_AVAILABLE:
-        raise Exception("Groq not configured")
+        raise Exception("Groq client initialization failure or missing GROQ_API_KEY config")
 
     response = groq_client.chat.completions.create(
-        model="llama-3.1-8b-instant",
+        model="llama-3.3-70b-versatile", # 👈 Upgraded to 70B for bulletproof recruitment parsing
         messages=[
             {
                 "role": "system",
-                "content": "You are an expert technical recruiter. Always respond with valid JSON only."
+                "content": "You are an expert technical recruiter assistant. Always respond with valid raw JSON structures matching the keys requested exactly."
             },
             {
                 "role": "user",
                 "content": prompt
             }
         ],
+        response_format={"type": "json_object"}, # 👈 Native JSON constraint protection
         temperature=0.1,
         max_tokens=2000
     )
@@ -178,7 +181,7 @@ def _error_result(candidate_name: str, error: str) -> dict:
             "Contact support if issue persists"
         ],
         "recommendation": "Maybe",
-        "summary": f"Automated evaluation could not complete for {candidate_name}. Please retry."
+        "summary": f"Automated evaluation could not complete for {candidate_name}. System tracing context: {error[:80]}"
     }
 
 
@@ -187,112 +190,50 @@ def score_resume_against_jd(
     resume_text: str,
     candidate_name: str = "Candidate"
 ) -> dict:
-    """Score resume with Gemini, fallback to Groq if quota exceeded"""
+    """Score resume with Groq first, fallback to Gemini if rate limits occur"""
 
     if not resume_text or len(resume_text.strip()) < 50:
         return _error_result(candidate_name, "Resume too short or empty")
 
     prompt = _build_prompt(jd_text, resume_text, candidate_name)
 
-    # ─── Try Groq First ─────────────────────
+    # ─── 1st Try: Primary Execution via Groq ─────────────────────
     try:
         result = _score_with_groq(prompt, candidate_name)
         return _validate_result(result, candidate_name)
     except Exception as groq_error:
         error_str = str(groq_error)
-        print(f"❌ Groq also failed for {candidate_name}: {error_str[:100]}", flush=True)
+        print(f"❌ Groq failed for {candidate_name}: {error_str[:100]}", flush=True)
 
-        # Check if quota exceeded
-        is_quota_error = any(x in error_str for x in [
-            "429", "RESOURCE_EXHAUSTED", "quota", "rate limit"
-        ])
-
-        if is_quota_error:
-            print(f"🔄 Quota exceeded, trying Gemini for {candidate_name}...", flush=True)
-        else:
-            print(f"🔄 Groq error, trying Gemini for {candidate_name}...", flush=True)
-
-    # ─── Fallback to Gemini ─────────────────────
-    try:
-        result = _score_with_gemini(prompt, candidate_name)
-        return _validate_result(result, candidate_name)
-    except Exception as gemini_error:
-        error_str = str(gemini_error)
-        print(f"⚠️ Gemini failed for {candidate_name}: {error_str[:100]}", flush=True)
+        # ─── 2nd Try: Fallback Execution via Gemini ──────────────────
+        print(f"🔄 Activating Gemini fallback pipeline for {candidate_name}...", flush=True)
+        try:
+            gemini_result = _score_with_gemini(prompt, candidate_name)
+            return _validate_result(gemini_result, candidate_name)
+        except Exception as gemini_error:
+            print(f"❌ Gemini fallback also failed for {candidate_name}: {gemini_error}", flush=True)
+            # 💡 FIXED: Explicitly return the structural error block if both engines fail
+            return _error_result(candidate_name, f"Groq Error: {error_str[:40]} | Gemini Error: {str(gemini_error)[:40]}")
 
 
-    # ─── Both Failed ──────────────────────────
-    return _error_result(candidate_name, "All AI services unavailable")
-
-
-def score_multiple_resumes(
-    jd_text: str,
-    resumes: list
-) -> list:
-    """Parallel AI screening"""
-
+def score_multiple_resumes(jd_text: str, resumes: list) -> list:
+    """Process up to 20 resumes concurrently using multithreaded workers to prevent UI connection drop-offs"""
     results = []
 
-    # VERY IMPORTANT
-    # Keep low for free-tier APIs
+    def _worker(resume_item):
+        name = resume_item.get("name", "Unknown Candidate")
+        text = resume_item.get("text", "")
+        return score_resume_against_jd(jd_text, text, name)
 
-    MAX_WORKERS = 2
-
-    tasks = [
-        (
-            jd_text,
-            resume,
-            idx,
-            len(resumes)
-        )
-        for idx, resume in enumerate(resumes)
-    ]
-
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=MAX_WORKERS
-    ) as executor:
-
-        future_to_resume = {
-            executor.submit(
-                process_single_resume,
-                task
-            ): task
-            for task in tasks
-        }
-
-        for future in concurrent.futures.as_completed(
-            future_to_resume
-        ):
-
+    print(f"🚀 Launching concurrent evaluation cluster for {len(resumes)} resumes...", flush=True)
+    
+    # max_workers=4 processes batches efficiently without hitting API network socket ceilings
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(_worker, r): r for r in resumes}
+        for future in concurrent.futures.as_completed(futures):
             try:
-
-                result = future.result(
-                    timeout=120
-                )
-
-                results.append(result)
-
+                data = future.result(timeout=60)
+                results.append(data)
             except Exception as e:
-
-                print(
-                    f"❌ Thread execution failed: {str(e)}",
-                    flush=True
-                )
-
-    # SORT RESULTS
-
-    results.sort(
-        key=lambda x: x.get(
-            "overall_score",
-            0
-        ),
-        reverse=True
-    )
-
-    # ADD RANKS
-
-    for idx, item in enumerate(results):
-
-        item["rank"] = idx + 1
-
-    return results
+                orig_item = futures[future]
+                fail_name = orig_item.get("name", "Unknown Candidate")
