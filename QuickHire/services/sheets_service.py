@@ -4,21 +4,22 @@ import os
 import json
 from datetime import datetime
 
+
 def get_sheets_client():
-    """Get authenticated Google Sheets client"""
     try:
         service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
         if not service_account_json:
-            print("⚠️ Google Sheets not configured")
+            print("⚠️ GOOGLE_SERVICE_ACCOUNT_JSON not set")
             return None
 
         creds_dict = json.loads(service_account_json)
         scopes = [
-            'https://spreadsheets.google.com/feeds',
+            'https://www.googleapis.com/auth/spreadsheets',
             'https://www.googleapis.com/auth/drive'
         ]
         creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-        return gspread.authorize(creds)
+        client = gspread.authorize(creds)
+        return client
 
     except Exception as e:
         print(f"❌ Sheets auth failed: {e}", flush=True)
@@ -26,7 +27,7 @@ def get_sheets_client():
 
 
 def add_user_to_sheet(user_data: dict):
-    """Add new user signup to Google Sheet"""
+    """Add new signup to Google Sheet"""
     try:
         client = get_sheets_client()
         if not client:
@@ -34,9 +35,21 @@ def add_user_to_sheet(user_data: dict):
 
         sheet_id = os.getenv("GOOGLE_SHEETS_ID")
         if not sheet_id:
+            print("⚠️ GOOGLE_SHEETS_ID not set")
             return False
 
         sheet = client.open_by_key(sheet_id).sheet1
+
+        # Check if headers exist, add if not
+        try:
+            first_row = sheet.row_values(1)
+            if not first_row:
+                sheet.append_row([
+                    "Signup Date", "Full Name", "Email", "Phone",
+                    "Company", "Plan", "Credits Left", "Status"
+                ])
+        except Exception:
+            pass
 
         row = [
             datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -50,16 +63,16 @@ def add_user_to_sheet(user_data: dict):
         ]
 
         sheet.append_row(row)
-        print(f"✅ User added to sheets: {user_data.get('email')}", flush=True)
+        print(f"✅ User added to sheet: {user_data.get('email')}", flush=True)
         return True
 
     except Exception as e:
-        print(f"❌ Sheets update failed: {e}", flush=True)
+        print(f"❌ Sheet add failed: {e}", flush=True)
         return False
 
 
-def update_user_credits_in_sheet(email: str, credits: int):
-    """Update user credits in sheet"""
+def update_user_credits_in_sheet(email: str, credits: int, plan: str = None):
+    """Update user credits after payment or usage"""
     try:
         client = get_sheets_client()
         if not client:
@@ -68,12 +81,12 @@ def update_user_credits_in_sheet(email: str, credits: int):
         sheet_id = os.getenv("GOOGLE_SHEETS_ID")
         sheet = client.open_by_key(sheet_id).sheet1
 
-        # Find user row by email
         cell = sheet.find(email)
         if cell:
-            # Update credits column (G = column 7)
             sheet.update_cell(cell.row, 7, credits)
-            print(f"✅ Credits updated in sheet for {email}", flush=True)
+            if plan:
+                sheet.update_cell(cell.row, 6, plan)
+            print(f"✅ Sheet updated for {email}: {credits} credits", flush=True)
 
         return True
 
