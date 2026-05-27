@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getResults, exportExcel } from '../services/api';
+import AutoLogout from '../components/AutoLogout';
 
 export default function Results() {
   const { id } = useParams();
@@ -96,6 +97,7 @@ export default function Results() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navbar */}
+      <AutoLogout />
       <nav className="bg-blue-900 text-white px-6 py-4 flex justify-between items-center shadow-lg">
         <div className="flex items-center gap-4">
           <button onClick={() => navigate('/dashboard')}

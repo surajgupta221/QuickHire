@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { uploadJD, uploadResumes } from '../services/api';
+import AutoLogout from '../components/AutoLogout';
 
 export default function NewScreening() {
   const navigate = useNavigate();
@@ -99,6 +100,7 @@ export default function NewScreening() {
                 step === i + 1 ? 'bg-blue-900 text-white' :
                 'bg-gray-200 text-gray-500'}`}>
                 {step > i + 1 ? '✓' : i + 1}
+                <AutoLogout />
               </div>
               <span className={`ml-2 text-sm font-medium ${step === i + 1 ? 'text-blue-900' : 'text-gray-400'}`}>
                 {s}
