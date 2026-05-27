@@ -30,10 +30,6 @@ app = FastAPI(
     version=settings.APP_VERSION,
 )
 
-# This tells FastAPI to catch both GET and HEAD network methods cleanly
-@app.route("/health", methods=["GET", "HEAD"])
-async def health_check(request: Request):
-    return Response(content="OK", status_code=200, media_type="text/plain")
 
 # CORS
 app.add_middleware(
@@ -80,6 +76,12 @@ def home():
 @app.get("/health", tags=["Health"])
 def health():
     return {"status": "healthy"}
+
+# ─── Change @app.route to @app.api_route ───────────────────
+@app.api_route("/health", methods=["GET", "HEAD"])
+async def health_check(request: Request):
+    """Cleanly catches both GET and HEAD network methods for Render pings"""
+    return Response(content="OK", status_code=200, media_type="text/plain")
 
 @app.get("/info", tags=["Health"])
 def info():
