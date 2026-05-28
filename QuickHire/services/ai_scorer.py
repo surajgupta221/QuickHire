@@ -35,37 +35,124 @@ RESUME:
 Return ONLY valid JSON. No markdown wrappers. No explanations. 
 CRITICAL: Do NOT copy the example scores (85 or 88). Calculate a unique, critical mathematical score based strictly on candidate alignment!
 
-Your response must strictly match this JSON schema structure:
-{{
-    "candidate_name": "{candidate_name}",
-    "overall_score": 0,
-    "match_percentage": 0,
-    "skills_matched": ["List distinct technical stacks matching the JD explicitly"],
-    "skills_missing": ["List missing technical skills or domain alignment gaps based on the JD"],
-    "experience_match": "Good",
-    "education_match": "Good",
-    "strengths": ["Identify unique, project-specific engineering achievements found in resume text"],
-    "weaknesses": ["Identify genuine technical limitations or architectural experience gaps"],
-    "interview_questions": [
-        "Easy question regarding core claimed experience",
-        "Medium problem-solving question regarding a mentioned project",
-        "Tough technical scenario question testing their specific stack",
-        "Question targeting an identified skill gap",
-        "Architectural or system design question based on past projects"
-    ],
-    "recommendation": "Recommended",
-    "summary": "Provide a comprehensive 3-sentence professional evaluation. Sentence 1: Core match justification. Sentence 2: Standout value proposition. Sentence 3: Definitive hiring verdict."
-}}
+You are a strict resume-to-JD screening engine for hiring teams.
 
-Strict Data Rules:
-- overall_score: Calculate a realistic dynamic integer between 0 and 100 based strictly on technical alignment.
-- match_percentage: Calculate a realistic dynamic integer between 0 and 100 based strictly on technical alignment.
-- Do not return generic phrases like 'Relevant experience'. Be hyper-specific to their resume text.
-- experience_match: must be exactly one of [Excellent, Good, Fair, Poor]
-- education_match: must be exactly one of [Excellent, Good, Fair, Poor]
-- recommendation: must be exactly one of [Highly Recommended, Recommended, Maybe, Not Recommended]
-- interview_questions: must contain exactly 5 specific questions matching the schema array length.
-- summary: minimum 3 complete sentences."""
+TASK
+Compare the candidate resume against the job description and produce a JSON object only.
+Your goal is to rank candidates conservatively and strictly. Do not be generous. Do not inflate scores. Use only explicit evidence from the resume and JD.
+
+STRICT RULES
+1. Score only what is explicitly supported by the resume text.
+2. Do not infer skills, domain knowledge, or seniority from vague statements.
+3. If a required skill is missing or unclear, count it as missing.
+4. If the resume does not prove recent hands-on experience with a required stack, treat it as missing.
+5. If location, relocation, work authorization, notice period, or shift compatibility are required and not explicitly matched, penalize heavily.
+6. If the resume is generic, keyword-stuffed, or lacks project depth, cap the score at 30.
+7. If the candidate lacks core JD stack alignment, cap the score at 20.
+8. Only award high scores when the resume directly proves most required skills, relevant projects, and matching seniority.
+9. Prefer precision over recall. False positives are worse than false negatives.
+10. Return only valid JSON matching the schema. No markdown, no explanation.
+
+SCORING MODEL
+Start at 100 and subtract penalties.
+
+Core technical alignment:
+- Required primary stack missing: -25 each
+- Required secondary skill missing: -10 each
+- No evidence of hands-on use in last 2–3 years: -15
+- Wrong role type or wrong domain: -15 to -25
+- Weak or generic project descriptions: -10 to -20
+- Missing measurable outcomes or technical ownership: -5 to -15
+
+Operational fit:
+- Location mismatch with no relocation proof: -15
+- Relocation not mentioned when required: -10
+- Notice period too long or absent when urgent hiring requires availability: -5 to -10
+- Work authorization/onsite/shift mismatch if required: -10 to -20
+
+Quality controls:
+- If resume contains only course names, certifications, or tutorials without project evidence, cap score at 20.
+- If resume shows unrelated experience with minimal overlap, cap score at 30.
+- If resume matches role title but not the actual stack, cap score at 40.
+- If resume matches stack and domain strongly, allow 70+.
+- Do not give 80+ unless at least 80% of must-have items are explicitly proven.
+
+RANKING BUCKETS
+- 0–20 = reject
+- 21–30 = weak match
+- 31–50 = partial match
+- 51–70 = moderate match
+- 71–85 = strong match
+- 86–100 = exceptional match
+
+JSON OUTPUT RULES
+- candidate_name: extract exact candidate name if available; otherwise "Unknown"
+- overall_score: integer 0–100 after penalties
+- match_percentage: integer 0–100; should be similar to overall_score but can be slightly lower if operational fit is weak
+- skills_matched: only explicit technical stacks from resume that are directly relevant to JD
+- skills_missing: only missing JD requirements or clear gaps
+- experience_match: one of [Excellent, Good, Fair, Poor]
+- education_match: one of [Excellent, Good, Fair, Poor]
+- strengths: specific project-level strengths with evidence
+- weaknesses: specific technical/architectural gaps
+- interview_questions: exactly 5 questions, tailored to the gaps and resume claims
+- recommendation: one of [Highly Recommended, Recommended, Maybe, Not Recommended]
+- summary: exactly 3 sentences, professional and strict
+
+DECISION LOGIC
+- If core mandatory stack is missing, recommendation cannot be "Recommended" or "Highly Recommended".
+- If location or relocation is a hard requirement and not proven, reduce recommendation by at least one level.
+- If the resume lacks project depth, reduce overall_score sharply even if keywords appear.
+- If the resume seems exaggerated or vague, treat claims conservatively.
+
+OUTPUT FORMAT
+Return only this JSON schema:
+{
+  "candidate_name": "",
+  "overall_score": 0,
+  "match_percentage": 0,
+  "skills_matched": [],
+  "skills_missing": [],
+  "experience_match": "",
+  "education_match": "",
+  "strengths": [],
+  "weaknesses": [],
+  "interview_questions": [],
+  "recommendation": "",
+  "summary": ""
+}
+
+# Your response must strictly match this JSON schema structure:
+# {{
+#     "candidate_name": "{candidate_name}",
+#     "overall_score": 0,
+#     "match_percentage": 0,
+#     "skills_matched": ["List distinct technical stacks matching the JD explicitly"],
+#     "skills_missing": ["List missing technical skills or domain alignment gaps based on the JD"],
+#     "experience_match": "Good",
+#     "education_match": "Good",
+#     "strengths": ["Identify unique, project-specific engineering achievements found in resume text"],
+#     "weaknesses": ["Identify genuine technical limitations or architectural experience gaps"],
+#     "interview_questions": [
+#         "Easy question regarding core claimed experience",
+#         "Medium problem-solving question regarding a mentioned project",
+#         "Tough technical scenario question testing their specific stack",
+#         "Question targeting an identified skill gap",
+#         "Architectural or system design question based on past projects"
+#     ],
+#     "recommendation": "Recommended",
+#     "summary": "Provide a comprehensive 3-sentence professional evaluation. Sentence 1: Core match justification. Sentence 2: Standout value proposition. Sentence 3: Definitive hiring verdict."
+# }}
+
+# Strict Data Rules:
+# - overall_score: Calculate a realistic dynamic integer between 0 and 100 based strictly on technical alignment.
+# - match_percentage: Calculate a realistic dynamic integer between 0 and 100 based strictly on technical alignment.
+# - Do not return generic phrases like 'Relevant experience'. Be hyper-specific to their resume text.
+# - experience_match: must be exactly one of [Excellent, Good, Fair, Poor]
+# - education_match: must be exactly one of [Excellent, Good, Fair, Poor]
+# - recommendation: must be exactly one of [Highly Recommended, Recommended, Maybe, Not Recommended]
+# - interview_questions: must contain exactly 5 specific questions matching the schema array length.
+# - summary: minimum 3 complete sentences."""
 
 def _score_with_gemini(prompt: str, candidate_name: str) -> dict:
     """Score using Gemini AI"""
