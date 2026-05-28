@@ -6,8 +6,7 @@ from schemas.user import UserRegister, UserLogin, Token, UserResponse
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 import os
-import sys
-import importlib.util
+from pydantic import BaseModel
 import secrets
 from services.sheets_service import add_user_to_sheet
 from services.email_service import send_password_reset_email, send_welcome_email
@@ -127,40 +126,61 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
         "user": UserResponse.model_validate(user)
     }
 
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
 # ─── Login ────────────────────────────────────
-@router.post("/login", response_model=Token)
-def login(credentials: UserLogin, db: Session = Depends(get_db)):
+@router.post("/login", tags=["Authentication"])
+def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     """Login with email and password"""
-    print("LOGIN ATTEMPT:", credentials.email)
+
+    print("LOGIN ATTEMPT:", login_data.email, flush=True)
+
     # Find user
-    user = get_user_by_email(db, credentials.email)
-    print("USER FOUND:", user)
+    user = get_user_by_email(db, login_data.email)
+
     if not user:
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
         )
-    print("HASHED PASSWORD:", user.hashed_password)
-    print("INPUT PASSWORD:", credentials.password)
 
-    # Check password
-    if not verify_password(credentials.password, user.hashed_password):
+    # Verify password
+    if not verify_password(
+        login_data.password,
+        user.hashed_password
+    ):
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
         )
-    print("LOGIN SUCCESS")
-    # Create token
-    token = create_access_token({"sub": user.email, "user_id": user.id})
+
+    print("LOGIN SUCCESS", flush=True)
+
+    # Create JWT token
+    token = create_access_token({
+        "sub": user.email,
+        "user_id": user.id
+    })
 
     return {
         "access_token": token,
         "token_type": "bearer",
-        "user": UserResponse.model_validate(user)
+        "user": {
+            "id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "company_name": user.company_name,
+            "screening_credits": user.screening_credits,
+            "plan": user.plan,
+            "onboarding_complete": user.onboarding_complete
+        }
     }
 
 # Store reset tokens temporarily (use Redis in production)
 reset_tokens = {}
+
 @router.post("/forgot-password", tags=["Authentication"])
 def forgot_password(email: str, db: Session = Depends(get_db)):
     user = get_user_by_email(db, email)
@@ -173,10 +193,20 @@ def forgot_password(email: str, db: Session = Depends(get_db)):
         "expires": datetime.now() + timedelta(hours=1)
     }
 
-    # Send actual email
-    send_password_reset_email(email, token, user.full_name)
+    # Try sending email
+    email_sent = send_password_reset_email(email, token, user.full_name)
 
-    return {"message": "Password reset link sent to your email! Check your inbox."}
+    # Always log token in case email fails
+    reset_url = f"https://quick-hire-lime.vercel.app/reset-password?token={token}&email={email}"
+    print(f"🔑 RESET LINK for {email}: {reset_url}", flush=True)
+
+    if email_sent:
+        return {"message": "Password reset link sent! Check your email inbox."}
+    else:
+        return {
+            "message": "Email delivery issue. Please contact support@quickhire.in or check Render logs.",
+            "note": "Reset link logged in server for manual delivery"
+        }
 
 
 @router.post("/reset-password", tags=["Authentication"])
@@ -218,7 +248,7 @@ def reset_password(
 @router.get("/me", response_model=UserResponse)
 def get_me(token: str, db: Session = Depends(get_db)):
     """Get current logged in user details"""
-    from ..services.auth import verify_token
+    from services.auth import verify_token
     payload = verify_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid token")
