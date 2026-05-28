@@ -21,9 +21,8 @@ except ImportError:
 
 
 def _build_prompt(jd_text: str, resume_text: str, candidate_name: str) -> str:
-    """Build the AI scoring prompt"""
-    return f"""You are an elite corporate technical recruiter and talent assessor.
-Critically evaluate the candidate {candidate_name} against the provided Job Description.
+    """Build strict AI scoring prompt"""
+    return f"""You are a strict resume-to-JD screening engine for hiring teams.
 
 JOB DESCRIPTION:
 {jd_text[:3000]}
@@ -32,44 +31,55 @@ CANDIDATE: {candidate_name}
 RESUME:
 {resume_text[:4000]}
 
-Return ONLY valid JSON. No markdown. No explanation. Just JSON.
+STRICT RULES:
+1. Score only explicit evidence in resume — do not infer skills
+2. If core required stack missing, cap score at 20
+3. If resume is generic without project depth, cap at 30
+4. If resume matches role title but not stack, cap at 40
+5. Only award 80+ when 80% of must-have skills explicitly proven
+6. Location/relocation mismatch = heavy penalty
 
-SCORING RULES:
-- Score strictly based on explicit evidence in resume
-- Do not infer or assume skills not mentioned
-- If core required stack is missing, cap score at 40
-- If resume is generic without project depth, cap at 30
-- Only award 80+ when 80% of must-have skills are explicitly proven
+SCORING MODEL (start at 100, subtract penalties):
+- Required primary stack missing: -25 each
+- Required secondary skill missing: -10 each
+- No recent hands-on evidence: -15
+- Wrong domain/role type: -15 to -25
+- Generic project descriptions: -10 to -20
+- Location mismatch: -15
 
-Return this exact JSON:
+RANKING: 0-20=reject, 21-30=weak, 31-50=partial, 51-70=moderate, 71-85=strong, 86-100=exceptional
+
+Return ONLY this JSON — no markdown, no explanation:
 {{
     "candidate_name": "{candidate_name}",
-    "overall_score": 75,
-    "match_percentage": 70,
-    "skills_matched": ["Python", "FastAPI", "REST APIs"],
-    "skills_missing": ["Docker", "Kubernetes"],
+    "overall_score": 0,
+    "match_percentage": 0,
+    "skills_matched": ["explicit skill from resume matching JD"],
+    "skills_missing": ["required JD skill not in resume"],
     "experience_match": "Good",
     "education_match": "Good",
-    "strengths": ["Strong Python background", "API development experience", "Good problem solving"],
-    "weaknesses": ["Limited cloud experience", "No DevOps exposure"],
+    "strengths": ["specific project evidence from resume"],
+    "weaknesses": ["specific technical gap"],
     "interview_questions": [
-        "Describe your most complex Python project?",
-        "How have you handled API authentication and security?",
-        "What databases have you worked with?",
-        "How do you handle performance issues in APIs?",
-        "Describe your experience with version control and deployment?"
+        "Question targeting core experience?",
+        "Question about specific project mentioned?",
+        "Question testing technical depth?",
+        "Question targeting skill gap?",
+        "System design or architecture question?"
     ],
     "recommendation": "Recommended",
-    "summary": "Strong candidate with relevant experience. Good technical alignment with the role requirements. Recommended for interview with focus on cloud and DevOps gaps."
+    "summary": "Sentence 1: Core match justification. Sentence 2: Standout value or gap. Sentence 3: Hiring verdict."
 }}
 
-Rules:
-- overall_score: integer 0-100
-- match_percentage: integer 0-100
+DECISION LOGIC:
+- Core mandatory stack missing = cannot be Recommended or Highly Recommended
+- Resume lacks project depth = reduce score sharply
+- Exaggerated or vague claims = treat conservatively
+- overall_score and match_percentage must be integers 0-100
 - experience_match: exactly Excellent/Good/Fair/Poor
-- education_match: exactly Excellent/Good/Fair/Poor
+- education_match: exactly Excellent/Good/Fair/Poor  
 - recommendation: exactly Highly Recommended/Recommended/Maybe/Not Recommended
-- interview_questions: exactly 5 questions
+- interview_questions: exactly 5 specific questions
 - summary: exactly 3 sentences"""
 
 
