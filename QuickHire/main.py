@@ -1,11 +1,6 @@
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-print("Python version:", sys.version, flush=True)
-print("Starting QuickHire...", flush=True)
-
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from database import engine, Base
@@ -13,6 +8,11 @@ from config import settings
 
 from models import user, screening as screening_model, payment as payment_model
 from routers import auth, screening, payment
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+print("Python version:", sys.version, flush=True)
+print("Starting QuickHire...", flush=True)
 
 # Create tables
 try:
@@ -28,7 +28,7 @@ app = FastAPI(
     version=settings.APP_VERSION,
 )
 
-# CORS
+# CORS — allow all origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,15 +42,20 @@ app.include_router(auth.router)
 app.include_router(screening.router)
 app.include_router(payment.router)
 
-# ─── Health Endpoints ─────────────────────────
+# Health
 @app.get("/", tags=["Health"])
 def home():
     return {"app": "QuickHire", "version": "1.0.0", "status": "running"}
 
 @app.get("/health", tags=["Health"])
-@app.head("/health")
 def health():
     return {"status": "healthy"}
+
+# ─── Change @app.route to @app.api_route ───────────────────
+@app.api_route("/health", methods=["GET", "HEAD"])
+async def health_check(request: Request):
+    """Cleanly catches both GET and HEAD network methods for Render pings"""
+    return Response(content="OK", status_code=200, media_type="text/plain")
 
 @app.get("/init-db", tags=["Health"])
 def init_db():
@@ -63,12 +68,6 @@ def init_db():
 @app.get("/info", tags=["Health"])
 def info():
     return {
-        "features": [
-            "Resume Upload Screening",
-            "AI Scoring 0-100",
-            "Excel Export",
-            "Email Automation"
-        ],
         "plans": {
             "free": "10 screenings",
             "pay_per_use": "₹49/screening",

@@ -35,7 +35,7 @@ app.add_middleware(
 )
 
 # Include API Routers
-app.include_router(auth.router)
+#app.include_router(auth.router)
 app.include_router(screening.router)
 app.include_router(payment.router)
 
