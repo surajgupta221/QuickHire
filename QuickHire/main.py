@@ -1,17 +1,11 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-<<<<<<< HEAD
-print("Python version:", sys.version)
-print("Starting QuickHire...")
-from fastapi import FastAPI, Request, Response
-=======
 
 print("Python version:", sys.version, flush=True)
 print("Starting QuickHire...", flush=True)
 
 from fastapi import FastAPI
->>>>>>> staging
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from database import engine, Base
@@ -34,12 +28,7 @@ app = FastAPI(
     version=settings.APP_VERSION,
 )
 
-<<<<<<< HEAD
-
 # CORS
-=======
-# CORS — allow all origins
->>>>>>> staging
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -53,22 +42,16 @@ app.include_router(auth.router)
 app.include_router(screening.router)
 app.include_router(payment.router)
 
-# Health
+# ─── Health Endpoints ─────────────────────────
 @app.get("/", tags=["Health"])
 def home():
     return {"app": "QuickHire", "version": "1.0.0", "status": "running"}
 
 @app.get("/health", tags=["Health"])
+@app.head("/health")
 def health():
     return {"status": "healthy"}
 
-<<<<<<< HEAD
-# ─── Change @app.route to @app.api_route ───────────────────
-@app.api_route("/health", methods=["GET", "HEAD"])
-async def health_check(request: Request):
-    """Cleanly catches both GET and HEAD network methods for Render pings"""
-    return Response(content="OK", status_code=200, media_type="text/plain")
-=======
 @app.get("/init-db", tags=["Health"])
 def init_db():
     try:
@@ -76,11 +59,16 @@ def init_db():
         return {"message": "Database tables created successfully!"}
     except Exception as e:
         return {"error": str(e)}
->>>>>>> staging
 
 @app.get("/info", tags=["Health"])
 def info():
     return {
+        "features": [
+            "Resume Upload Screening",
+            "AI Scoring 0-100",
+            "Excel Export",
+            "Email Automation"
+        ],
         "plans": {
             "free": "10 screenings",
             "pay_per_use": "₹49/screening",
