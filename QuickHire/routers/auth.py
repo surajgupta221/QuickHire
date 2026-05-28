@@ -7,7 +7,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 import os
 from pydantic import BaseModel
-import secrets
+import secrets as secrets_module
 from services.sheets_service import add_user_to_sheet
 from services.email_service import send_password_reset_email, send_welcome_email
 from datetime import datetime, timedelta
@@ -21,34 +21,77 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 # ─── Router ───────────────────────────────────
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+class GoogleLoginRequest(BaseModel):
+    google_token: str
+
 @router.post("/google-login", tags=["Authentication"])
-def google_login(google_token: str, db: Session = Depends(get_db)):
-    """Login or register with Google"""
+def google_login(request: GoogleLoginRequest, db: Session = Depends(get_db)):
+    """Login or register with Google OAuth"""
     try:
+        google_client_id = os.getenv("GOOGLE_CLIENT_ID")
+        if not google_client_id:
+            raise HTTPException(status_code=500, detail="Google login not configured")
+
         idinfo = id_token.verify_oauth2_token(
-            google_token,
+            request.google_token,
             google_requests.Request(),
-            GOOGLE_CLIENT_ID
+            google_client_id
         )
 
-        email = idinfo['email']
+        email = idinfo.get('email')
         full_name = idinfo.get('name', email.split('@')[0])
 
+        if not email:
+            raise HTTPException(status_code=400, detail="Could not get email from Google")
+
         user = get_user_by_email(db, email)
+
         if not user:
             user = create_user(
                 db=db,
                 full_name=full_name,
                 email=email,
-                password=secrets.token_urlsafe(32),
-                company_name=None,
-                phone=None
+                password=secrets_module.token_urlsafe(32),
+                company_name='',
+                phone=''
             )
-            send_welcome_email(email, full_name)
+            try:
+                send_welcome_email(email, full_name)
+            except Exception as e:
+                print(f"Welcome email failed: {e}", flush=True)
+            try:
+                add_user_to_sheet({
+                    "full_name": full_name,
+                    "email": email,
+                    "phone": "",
+                    "company_name": "",
+                    "plan": "free",
+                    "screening_credits": 10
+                })
+            except Exception as e:
+                print(f"Sheets failed: {e}", flush=True)
 
         token = create_access_token({"sub": user.email, "user_id": user.id})
-        return {"access_token": token, "token_type": "bearer", "user": user}
+        print(f"Google login: {email}", flush=True)
 
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {
+                "id": user.id,
+                "full_name": user.full_name,
+                "email": user.email,
+                "company_name": user.company_name,
+                "screening_credits": user.screening_credits,
+                "plan": user.plan,
+                "onboarding_complete": user.onboarding_complete
+            }
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid Google token: {str(e)}")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Google login failed: {str(e)}")
 
