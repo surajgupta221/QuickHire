@@ -12,8 +12,8 @@ def send_email(to_email: str, subject: str, html_body: str) -> bool:
 
         resend.api_key = api_key
 
-        # Verified subdomain sender routing configuration
-        from_address = "QuickHire <noreply@send.thequickhire.in>"
+        # Must use verified domain email address
+        from_address = "QuickHire <noreply@thequickhire.in>"
 
         params: resend.Emails.SendParams = {
             "from": from_address,
@@ -34,9 +34,9 @@ def send_email(to_email: str, subject: str, html_body: str) -> bool:
 
 
 def send_password_reset_email(to_email: str, reset_token: str, full_name: str):
-    """Send password reset email mapped directly to staging layer"""
+    """Send password reset email"""
     reset_url = (
-        f"https://thequickhire.in"
+        f"https://staging.thequickhire.in/reset-password"
         f"?token={reset_token}&email={to_email}"
     )
     html_body = f"""
@@ -102,7 +102,7 @@ def send_welcome_email(to_email: str, full_name: str):
                 <li>✅ Auto-generated interview questions</li>
             </ul>
             <div style="text-align:center;margin:35px 0;">
-                <a href="https://thequickhire.in"
+                <a href="https://staging.thequickhire.in"
                    style="background:#1B4F9E;color:white;padding:15px 35px;
                           text-decoration:none;border-radius:8px;font-weight:bold;
                           font-size:16px;display:inline-block;">
