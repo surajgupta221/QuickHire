@@ -26,49 +26,46 @@ Critically evaluate the candidate {candidate_name} against the provided Job Desc
 Provide deeply analytical, specific, and impactful hiring metrics.
 
 JOB DESCRIPTION:
-{jd_text[:2000]}
+{jd_text[:4000]}
 
 CANDIDATE: {candidate_name}
 RESUME:
-{resume_text[:3500]}
+{resume_text[:6000]}
 
-Return ONLY valid JSON. No markdown wrappers. No explanations. Just this exact JSON structure:
+Return ONLY valid JSON. No markdown wrappers. No explanations. 
+CRITICAL: Do NOT copy the example scores (85 or 88). Calculate a unique, critical mathematical score based strictly on candidate alignment!
+
+Your response must strictly match this JSON schema structure:
 {{
-     "candidate_name": "{candidate_name}",
-    "overall_score": 85,
-    "match_percentage": 88,
-    "skills_matched": ["List here only distinct advanced tech stacks matching the JD explicitly"],
-    "skills_missing": ["List clear missing technical skills or domain alignment gaps based on the JD requirements"],
-    "experience_match": "Excellent",
+    "candidate_name": "{candidate_name}",
+    "overall_score": 0,
+    "match_percentage": 0,
+    "skills_matched": ["List distinct technical stacks matching the JD explicitly"],
+    "skills_missing": ["List missing technical skills or domain alignment gaps based on the JD"],
+    "experience_match": "Good",
     "education_match": "Good",
-    "strengths": ["Identify 6 highly unique, project-specific engineering achievements found in their resume text"],
-    "weaknesses": ["Identify 3 genuine technical limitations or architectural experience gaps"],
+    "strengths": ["Identify unique, project-specific engineering achievements found in resume text"],
+    "weaknesses": ["Identify genuine technical limitations or architectural experience gaps"],
     "interview_questions": [
-        "Create a Easy question to confirm their claimed experience with a core skill from the JD.",
-        "Create a Medium question to probe their problem-solving approach on a relevant project they mentioned.",
-        "Create a tough, customized technical scenario question testing their specific claimed stack.",
-        "Create a question targeting one of their identified skill gaps.",
-        "Create an architectural or system design question based on their past projects."
+        "Easy question regarding core claimed experience",
+        "Medium problem-solving question regarding a mentioned project",
+        "Tough technical scenario question testing their specific stack",
+        "Question targeting an identified skill gap",
+        "Architectural or system design question based on past projects"
     ],
-    "recommendation": "Highly Recommended",
-    "summary": "Provide a comprehensive 3-sentence professional evaluation. Sentence 1: Core match justification. Sentence 2: Standout value proposition or project background. Sentence 3: Definitive hiring verdict for management review."
+    "recommendation": "Recommended",
+    "summary": "Provide a comprehensive 3-sentence professional evaluation. Sentence 1: Core match justification. Sentence 2: Standout value proposition. Sentence 3: Definitive hiring verdict."
 }}
 
-Strict Rules:
+Strict Data Rules:
+- overall_score: Calculate a realistic dynamic integer between 0 and 100 based strictly on technical alignment.
+- match_percentage: Calculate a realistic dynamic integer between 0 and 100 based strictly on technical alignment.
 - Do not return generic phrases like 'Relevant experience'. Be hyper-specific to their resume text.
-
-Rules:
-- overall_score: integer 0-100, critical technical review.
-- match_percentage: integer 0-100, critical technical review.
-- experience_match: exactly one of Excellent/Good/Fair/Poor
-- education_match: exactly one of Excellent/Good/Fair/Poor
-- recommendation: Must be exactly one of [Highly Recommended, Recommended, Maybe, Not Recommended]
-- skills_matched: minimum 3 real skills from resume
-- skills_missing: minimum 2 skills from JD not in resume
-- strengths: minimum 3 specific strengths
-- interview_questions: exactly 3 specific questions
-- summary: minimum 2 complete sentences"""
-
+- experience_match: must be exactly one of [Excellent, Good, Fair, Poor]
+- education_match: must be exactly one of [Excellent, Good, Fair, Poor]
+- recommendation: must be exactly one of [Highly Recommended, Recommended, Maybe, Not Recommended]
+- interview_questions: must contain exactly 5 specific questions matching the schema array length.
+- summary: minimum 3 complete sentences."""
 
 def _score_with_gemini(prompt: str, candidate_name: str) -> dict:
     """Score using Gemini AI"""
@@ -229,6 +226,31 @@ def process_single_resume(args) -> dict:
     name = resume.get("name", f"Candidate #{idx+1}")
     text = resume.get("text", "")
     return score_resume_against_jd(jd_text, text, name)
+
+def apply_percentile_tiers(results: list) -> list:
+    """Categorizes candidates dynamically into elite recruitment percentiles based on total batch size"""
+    total = len(results)
+    if total == 0:
+        return results
+
+    # Sort candidates by overall score to rank them
+    results.sort(key=lambda x: x.get("overall_score", 0), reverse=True)
+
+    for idx, item in enumerate(results):
+        # Calculate individual rank position percentage
+        position_percentile = (idx / total) * 100
+
+        if position_percentile <= 20:
+            item["tier_category"] = "⭐ Top 20% (Elite Tier)"
+        elif position_percentile <= 50:
+            item["tier_category"] = "📈 Mid 30% (Strong Tier)"
+        else:
+            item["tier_category"] = "📋 Rest 50% (Standard Tier)"
+            
+        item["rank"] = idx + 1
+        
+    results = apply_percentile_tiers(results)
+    return results
 
 
 def score_multiple_resumes(jd_text: str, resumes: list) -> list:

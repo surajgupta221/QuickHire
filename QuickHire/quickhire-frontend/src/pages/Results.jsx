@@ -183,11 +183,22 @@ export default function Results() {
                         </div>
 
                         {/* Info */}
-                        <div className="flex-1 min-w-0">
+                        <div>
                           <p className="font-bold text-gray-800 text-lg">{r.candidate_name}</p>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${getRecColor(r.recommendation)}`}>
-                            {r.recommendation || 'Pending'}
-                          </span>
+                          <div className="flex gap-2 mt-1 flex-wrap">
+                            <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${getRecColor(r.recommendation)}`}>
+                              {r.recommendation}
+                            </span>
+                            {/* 🚀 NEW TIER BADGE ADDED HERE */}
+                            {r.tier_category && (
+                              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold text-white ${
+                                r.tier_category.includes('Top 20%') ? 'bg-amber-600' :
+                                r.tier_category.includes('Mid 30%') ? 'bg-indigo-600' : 'bg-gray-500'
+                              }`}>
+                                {r.tier_category}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {/* Score Circle */}
