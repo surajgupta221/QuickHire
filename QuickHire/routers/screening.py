@@ -215,7 +215,7 @@ def get_history(token: str, db: Session = Depends(get_db)):
     user = get_current_user(token, db)
     screenings = db.query(Screening).filter(
         Screening.user_id == user.id
-    ).order_by(Screening.created_at.desc()).all()
+    ).order_by(Screening.id.desc()).all()
     return {
         "total": len(screenings),
         "screenings": [
@@ -225,7 +225,7 @@ def get_history(token: str, db: Session = Depends(get_db)):
                 "location": s.location,
                 "total_candidates": s.total_candidates,
                 "status": s.status,
-                "created_at": s.created_at
+                "created_at": getattr(s, "created_at", "Not specified") 
             }
             for s in screenings
         ]
