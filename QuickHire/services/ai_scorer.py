@@ -73,8 +73,8 @@ Return ONLY this JSON — no markdown, no explanation, no apologies, no disclaim
     "skills_missing": ["required JD skill not in resume"],
     "experience_match": "Good",
     "education_match": "Good",
-    "strengths": ["specific project evidence from resume", "relevant domain experience", "strong education background"],
-    "weaknesses": ["specific technical gap", "lack of project depth", "location mismatch"],
+    "strengths": ["specific project evidence from resume", "relevant domain experience", "strong education background", "clear career progression"],
+    "weaknesses": ["specific technical gap", "lack of project depth", "location mismatch", "generic resume statements"],
     "interview_questions": [
         "Question targeting core experience?",
         "Question about specific project mentioned?",
