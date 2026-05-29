@@ -133,7 +133,9 @@ async def upload_resumes(
         process_resumes_background,
         screening_id,
         screening.jd_text,
-        resume_data
+        resume_data,
+        screening.must_have_skills or "",
+        screening.good_to_have_skills or ""
     )
 
     return {
@@ -146,12 +148,12 @@ async def upload_resumes(
     }
 
 
-def process_resumes_background(screening_id: int, jd_text: str, resume_data: list):
+def process_resumes_background(screening_id: int, jd_text: str, resume_data: list, must_have_skills: str = "", good_to_have_skills: str = ""):
     """Process resumes in background"""
     db = SessionLocal()
     try:
         print(f"🚀 Starting background screening for {screening_id}", flush=True)
-        results = score_multiple_resumes(jd_text, resume_data)
+        results = score_multiple_resumes(jd_text, resume_data, must_have_skills, good_to_have_skills)
 
         screening = db.query(Screening).filter(Screening.id == screening_id).first()
         if screening:

@@ -20,9 +20,20 @@ except ImportError:
     GROQ_AVAILABLE = False
 
 
-def _build_prompt(jd_text: str, resume_text: str, candidate_name: str) -> str:
+def _build_prompt(jd_text: str, resume_text: str, candidate_name: str, must_have_skills: str = "", good_to_have_skills: str = "") -> str:
     """Build strict AI scoring prompt"""
-    return f"""You are a strict resume-to-JD screening engine for hiring teams.
+    must_section = f"""
+⚠️ MUST HAVE SKILLS (mandatory — if missing, cap score at 35):
+{must_have_skills}
+""" if must_have_skills.strip() else ""
+
+    good_section = f"""
+✅ GOOD TO HAVE SKILLS (bonus if present):
+{good_to_have_skills}
+""" if good_to_have_skills.strip() else ""
+
+    return f"""You are a strict resume-to-JD screening engine for hiring teams..
+{must_section}{good_section}
 
 JOB DESCRIPTION:
 {jd_text[:3000]}
@@ -30,6 +41,8 @@ JOB DESCRIPTION:
 CANDIDATE: {candidate_name}
 RESUME:
 {resume_text[:4000]}
+
+CRITICAL: If ANY must-have skill is missing from resume, overall_score MUST be 35 or below.
 
 STRICT RULES:
 1. Score only explicit evidence in resume — do not infer skills
@@ -49,17 +62,19 @@ SCORING MODEL (start at 100, subtract penalties):
 
 RANKING: 0-20=reject, 21-30=weak, 31-50=partial, 51-70=moderate, 71-85=strong, 86-100=exceptional
 
-Return ONLY this JSON — no markdown, no explanation:
+Return ONLY this JSON — no markdown, no explanation, no apologies, no disclaimers, no filler text:
 {{
     "candidate_name": "{candidate_name}",
     "overall_score": 0,
     "match_percentage": 0,
+    "must_have_matched": ["must-have skills found in resume"],
+    "must_have_missing": ["must-have skills NOT in resume"],
     "skills_matched": ["explicit skill from resume matching JD"],
     "skills_missing": ["required JD skill not in resume"],
     "experience_match": "Good",
     "education_match": "Good",
-    "strengths": ["specific project evidence from resume"],
-    "weaknesses": ["specific technical gap"],
+    "strengths": ["specific project evidence from resume", "relevant domain experience", "strong education background"],
+    "weaknesses": ["specific technical gap", "lack of project depth", "location mismatch"],
     "interview_questions": [
         "Question targeting core experience?",
         "Question about specific project mentioned?",
@@ -68,19 +83,20 @@ Return ONLY this JSON — no markdown, no explanation:
         "System design or architecture question?"
     ],
     "recommendation": "Recommended",
-    "summary": "Sentence 1: Core match justification. Sentence 2: Standout value or gap. Sentence 3: Hiring verdict."
+    "summary": "Sentence 1: Core match justification. Sentence 2: Standout value or gap. Sentence 3: Hiring verdict. Sentence 4: Interview recommendation. Sentence 5: Any red flags or final notes."
 }}
 
 DECISION LOGIC:
 - Core mandatory stack missing = cannot be Recommended or Highly Recommended
 - Resume lacks project depth = reduce score sharply
 - Exaggerated or vague claims = treat conservatively
+- If must-have skills missing: max score = 35
 - overall_score and match_percentage must be integers 0-100
 - experience_match: exactly Excellent/Good/Fair/Poor
 - education_match: exactly Excellent/Good/Fair/Poor  
 - recommendation: exactly Highly Recommended/Recommended/Maybe/Not Recommended
 - interview_questions: exactly 5 specific questions
-- summary: exactly 3 sentences"""
+- summary: exactly 5 sentences"""
 
 
 def _score_with_gemini(prompt: str, candidate_name: str) -> dict:
@@ -230,14 +246,16 @@ def apply_percentile_tiers(results: list) -> list:
 def score_resume_against_jd(
     jd_text: str,
     resume_text: str,
-    candidate_name: str = "Candidate"
+    candidate_name: str = "Candidate",
+    must_have_skills: str = "",
+    good_to_have_skills: str = ""
 ) -> dict:
     """Score resume — Groq first, Gemini as fallback"""
 
     if not resume_text or len(resume_text.strip()) < 50:
         return _error_result(candidate_name, "Resume too short or empty")
 
-    prompt = _build_prompt(jd_text, resume_text, candidate_name)
+    prompt = _build_prompt(jd_text, resume_text, candidate_name, must_have_skills, good_to_have_skills)
 
     # Try Groq first
     try:
@@ -262,20 +280,20 @@ def score_resume_against_jd(
 
 def process_single_resume(args) -> dict:
     """Worker for thread pool"""
-    jd_text, resume, idx, total = args
+    jd_text, resume, idx, total, must_have, good_to_have = args
     name = resume.get("name", f"Candidate {idx+1}")
     text = resume.get("text", "")
     print(f"Processing {idx+1}/{total}: {name}", flush=True)
-    return score_resume_against_jd(jd_text, text, name)
+    return score_resume_against_jd(jd_text, text, name, must_have, good_to_have)
 
 
-def score_multiple_resumes(jd_text: str, resumes: list) -> list:
+def score_multiple_resumes(jd_text: str, resumes: list, must_have_skills: str = "", good_to_have_skills: str = "") -> list:
     """Score all resumes in parallel"""
     results = []
     MAX_WORKERS = 4
 
     tasks = [
-        (jd_text, resume, idx, len(resumes))
+        (jd_text, resume, idx, len(resumes), must_have_skills, good_to_have_skills)
         for idx, resume in enumerate(resumes)
     ]
 
