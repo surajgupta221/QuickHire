@@ -70,8 +70,6 @@ def init_db():
         return {"message": "Database updated successfully!"}
     except Exception as e:
         return {"error": str(e)}
-    except Exception as e:
-        return {"error": str(e)}
 
 @app.get("/info", tags=["Health"])
 def info():
