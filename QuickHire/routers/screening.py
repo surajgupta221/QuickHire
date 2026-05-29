@@ -32,6 +32,8 @@ async def upload_jd(
     location: str = Form(""),
     jd_text: Optional[str] = Form(None),
     jd_file: Optional[UploadFile] = File(None),
+    must_have_skills: str = Form(""),
+    good_to_have_skills: str = Form(""),
     token: str = Form(...),
     db: Session = Depends(get_db)
 ):
@@ -60,6 +62,8 @@ async def upload_jd(
         job_title=job_title,
         jd_text=extracted_jd,
         location=location,
+        must_have_skills=must_have_skills,
+        good_to_have_skills=good_to_have_skills,
         status="pending"
     )
     db.add(screening)
@@ -70,7 +74,9 @@ async def upload_jd(
         "message": "JD uploaded successfully",
         "screening_id": screening.id,
         "job_title": job_title,
-        "jd_preview": extracted_jd[:200] + "..." if len(extracted_jd) > 200 else extracted_jd
+        "must_have_skills": must_have_skills,
+        "good_to_have_skills": good_to_have_skills
+        
     }
 
 # ─── Upload Resumes ───────────────────────────

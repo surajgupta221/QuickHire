@@ -14,6 +14,10 @@ class Screening(Base):
     jd_text = Column(Text, nullable=False)
     location = Column(String, nullable=True)
 
+    # Skills (optional) - can be used to enhance scoring
+    must_have_skills = Column(String, nullable=True)  # comma separated
+    good_to_have_skills = Column(String, nullable=True)  # comma separated
+
     # Results
     total_candidates = Column(Integer, default=0)
     results = Column(JSON, nullable=True)  # stores all scores
