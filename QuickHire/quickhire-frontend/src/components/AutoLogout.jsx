@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const IDLE_TIMEOUT = 5 * 60 * 1000;      // 5 minutes
-const WARNING_BEFORE = 2 * 60 * 1000;      // warn 2 min before
+const WARNING_BEFORE = 2 * 60 * 1000;    // warn 2 min before
 const WARNING_TIMEOUT = IDLE_TIMEOUT - WARNING_BEFORE;
 
 export default function AutoLogout() {
@@ -10,60 +10,63 @@ export default function AutoLogout() {
   const [showWarning, setShowWarning] = useState(false);
   const [countdown, setCountdown] = useState(120);
 
+  // Use refs to avoid tearing down event listeners on state updates
+  const showWarningRef = useRef(false);
+  const warningTimerRef = useRef(null);
+  const logoutTimerRef = useRef(null);
+  const countdownIntervalRef = useRef(null);
+
   const logout = useCallback(() => {
     localStorage.clear();
     navigate('/login');
   }, [navigate]);
 
-  useEffect(() => {
-    let warningTimer;
-    let logoutTimer;
-    let countdownInterval;
+  const resetTimers = useCallback(() => {
+    // Clear everything
+    clearTimeout(warningTimerRef.current);
+    clearTimeout(logoutTimerRef.current);
+    clearInterval(countdownIntervalRef.current);
+    
+    setShowWarning(false);
+    showWarningRef.current = false;
+    setCountdown(120);
 
-    const resetTimers = () => {
-      // Clear existing
-      clearTimeout(warningTimer);
-      clearTimeout(logoutTimer);
-      clearInterval(countdownInterval);
-      setShowWarning(false);
+    // Set warning timeout
+    warningTimerRef.current = setTimeout(() => {
+      setShowWarning(true);
+      showWarningRef.current = true;
       setCountdown(120);
 
-      // Set warning timer
-      warningTimer = setTimeout(() => {
-        setShowWarning(true);
-        setCountdown(120);
+      // Start countdown ticker
+      countdownIntervalRef.current = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(countdownIntervalRef.current);
+            logout();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }, WARNING_TIMEOUT);
 
-        // Start countdown
-        countdownInterval = setInterval(() => {
-          setCountdown(prev => {
-            if (prev <= 1) {
-              clearInterval(countdownInterval);
-              logout();
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
+    // Set fallback absolute hard logout timeout
+    logoutTimerRef.current = setTimeout(() => {
+      logout();
+    }, IDLE_TIMEOUT);
+  }, [logout]);
 
-      }, WARNING_TIMEOUT);
-
-      // Set logout timer
-      logoutTimer = setTimeout(() => {
-        logout();
-      }, IDLE_TIMEOUT);
-    };
-
-    // Start timers
+  useEffect(() => {
     resetTimers();
 
-    // Reset on user activity
     const events = [
       'mousedown', 'mousemove', 'keydown',
       'scroll', 'touchstart', 'click', 'keypress'
     ];
 
     const handleActivity = () => {
-      if (!showWarning) {
+      // Only reset if warning modal isn't currently blocking the UI
+      if (!showWarningRef.current) {
         resetTimers();
       }
     };
@@ -71,25 +74,22 @@ export default function AutoLogout() {
     events.forEach(e => window.addEventListener(e, handleActivity));
 
     return () => {
-      clearTimeout(warningTimer);
-      clearTimeout(logoutTimer);
-      clearInterval(countdownInterval);
+      clearTimeout(warningTimerRef.current);
+      clearTimeout(logoutTimerRef.current);
+      clearInterval(countdownIntervalRef.current);
       events.forEach(e => window.removeEventListener(e, handleActivity));
     };
-  }, [logout]);
+  }, [resetTimers]);
 
   const stayLoggedIn = () => {
-    setShowWarning(false);
-    setCountdown(120);
-    // Trigger activity reset by dispatching event
-    window.dispatchEvent(new Event('mousedown'));
+    resetTimers();
   };
 
   if (!showWarning) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl animate-bounce-once">
+      <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl">
         <div className="text-center">
           <div className="text-5xl mb-4">⏰</div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">
