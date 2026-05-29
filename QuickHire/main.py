@@ -69,7 +69,7 @@ def init_db():
 
         return {"message": "Database updated successfully!"}
     except Exception as e:
-        return {"error": str(e)} {"message": "Database tables created successfully!"}
+        return {"error": str(e)}
     except Exception as e:
         return {"error": str(e)}
 
