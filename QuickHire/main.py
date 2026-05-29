@@ -49,24 +49,16 @@ def health():
 @app.get("/init-db", tags=["Health"])
 def init_db():
     try:
-        # Create new tables
         Base.metadata.create_all(bind=engine)
-
-        # Add missing columns if they don't exist
         from sqlalchemy import text
         with engine.connect() as conn:
-            try:
-                conn.execute(text(
-                    "ALTER TABLE screenings ADD COLUMN IF NOT EXISTS must_have_skills VARCHAR"
-                ))
-                conn.execute(text(
-                    "ALTER TABLE screenings ADD COLUMN IF NOT EXISTS good_to_have_skills VARCHAR"
-                ))
-                conn.commit()
-                print("✅ Columns added!", flush=True)
-            except Exception as col_err:
-                print(f"Column note: {col_err}", flush=True)
-
+            conn.execute(text(
+                "ALTER TABLE screenings ADD COLUMN IF NOT EXISTS must_have_skills VARCHAR"
+            ))
+            conn.execute(text(
+                "ALTER TABLE screenings ADD COLUMN IF NOT EXISTS good_to_have_skills VARCHAR"
+            ))
+            conn.commit()
         return {"message": "Database updated successfully!"}
     except Exception as e:
         return {"error": str(e)}

@@ -225,7 +225,7 @@ def get_history(token: str, db: Session = Depends(get_db)):
                 "location": s.location,
                 "total_candidates": s.total_candidates,
                 "status": s.status,
-                "created_at": tr(getattr(s, "created_at", "Not specified") )
+                "created_at": str(getattr(s, "created_at", "Not specified") )
             }
             for s in screenings
         ]
