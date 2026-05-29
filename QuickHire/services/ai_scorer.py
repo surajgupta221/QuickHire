@@ -190,6 +190,7 @@ def _validate_result(result: dict, candidate_name: str) -> dict:
             f"{candidate_name} has been evaluated against the job requirements. "
             f"Please review the detailed breakdown above. "
             f"Consider scheduling an interview to assess further."
+            f" Note: Automated screening is a preliminary step and should be complemented with human judgment."
         )
     return result
 
