@@ -147,8 +147,8 @@ def _score_with_groq(prompt: str, candidate_name: str) -> dict:
     return result
 
 
-def _validate_result(result: dict, candidate_name: str) -> dict:
-    """Ensure all required fields exist and are valid"""
+def _validate_result(result: dict, candidate_name: str,
+                     must_have_skills: str = "") -> dict:
     result["candidate_name"] = candidate_name
 
     if not isinstance(result.get("overall_score"), (int, float)):
@@ -158,6 +158,25 @@ def _validate_result(result: dict, candidate_name: str) -> dict:
 
     result["overall_score"] = max(0, min(100, int(result["overall_score"])))
     result["match_percentage"] = max(0, min(100, int(result["match_percentage"])))
+
+    # ─── ENFORCE MUST HAVE SKILLS CAP ─────────────
+    if must_have_skills and must_have_skills.strip():
+        must_have_list = [s.strip().lower() for s in must_have_skills.split(',') if s.strip()]
+        must_have_missing = result.get("must_have_missing", [])
+
+        # Check if any must-have skill is missing
+        if must_have_missing and len(must_have_missing) > 0:
+            # Check it's not just placeholder text
+            real_missing = [m for m in must_have_missing
+                          if m not in ["must-have skills NOT in resume", "None", "N/A", ""]]
+            if real_missing:
+                if result["overall_score"] > 35:
+                    print(f"⚠️ Capping {candidate_name} score from {result['overall_score']} to 35 — missing must-have skills: {real_missing}", flush=True)
+                    result["overall_score"] = min(result["overall_score"], 35)
+                    result["match_percentage"] = min(result["match_percentage"], 35)
+                    # Force recommendation down
+                    if result.get("recommendation") in ["Highly Recommended", "Recommended"]:
+                        result["recommendation"] = "Maybe"
 
     valid_exp = ["Excellent", "Good", "Fair", "Poor"]
     if result.get("experience_match") not in valid_exp:
@@ -173,6 +192,10 @@ def _validate_result(result: dict, candidate_name: str) -> dict:
         result["skills_matched"] = ["General technical skills"]
     if not result.get("skills_missing"):
         result["skills_missing"] = ["Needs further assessment"]
+    if not result.get("must_have_matched"):
+        result["must_have_matched"] = []
+    if not result.get("must_have_missing"):
+        result["must_have_missing"] = []
     if not result.get("strengths"):
         result["strengths"] = ["Relevant background for the role"]
     if not result.get("weaknesses"):
@@ -190,7 +213,8 @@ def _validate_result(result: dict, candidate_name: str) -> dict:
             f"{candidate_name} has been evaluated against the job requirements. "
             f"Please review the detailed breakdown above. "
             f"Consider scheduling an interview to assess further."
-            f" Note: Automated screening is a preliminary step and should be complemented with human judgment."
+            f" Final recommendation is {result.get('recommendation', 'Maybe')}."
+            f" Note: This is an automated assessment and should be used as one of multiple factors in the hiring decision process."
         )
     return result
 
@@ -219,6 +243,7 @@ def _error_result(candidate_name: str, error: str) -> dict:
             f"Automated evaluation could not complete for {candidate_name}. "
             f"Please retry the screening process. "
             f"If the issue persists, contact support."
+            f"Must ensure resume is properly formatted and API services are operational."
         )
     }
 
@@ -261,7 +286,7 @@ def score_resume_against_jd(
     # Try Groq first
     try:
         result = _score_with_groq(prompt, candidate_name)
-        return _validate_result(result, candidate_name)
+        return _validate_result(result, candidate_name, must_have_skills)
     except Exception as groq_error:
         error_str = str(groq_error)
         print(f"❌ Groq failed for {candidate_name}: {error_str[:100]}", flush=True)
@@ -270,7 +295,7 @@ def score_resume_against_jd(
     # Fallback to Gemini
     try:
         result = _score_with_gemini(prompt, candidate_name)
-        return _validate_result(result, candidate_name)
+        return _validate_result(result, candidate_name, must_have_skills)
     except Exception as gemini_error:
         print(f"⚠️ Gemini also failed for {candidate_name}: {gemini_error}", flush=True)
         return _error_result(
