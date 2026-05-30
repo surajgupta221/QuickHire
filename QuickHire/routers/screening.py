@@ -154,29 +154,55 @@ async def upload_resumes(
     }
 
 
-def process_resumes_background(screening_id: int, jd_text: str, resume_data: list, must_have_skills: str = "", good_to_have_skills: str = ""):
-    """Process resumes in background"""
+def process_resumes_background(screening_id: int, jd_text: str,
+                                resume_data: list,
+                                must_have_skills: str = "",
+                                good_to_have_skills: str = ""):
     db = SessionLocal()
     try:
-        print(f"🚀 Starting background screening for {screening_id}", flush=True)
-        results = score_multiple_resumes(jd_text, resume_data, must_have_skills, good_to_have_skills)
+        results = score_multiple_resumes(
+            jd_text, resume_data,
+            must_have_skills, good_to_have_skills
+        )
+        screening = db.query(Screening).filter(
+            Screening.id == screening_id
+        ).first()
 
-        screening = db.query(Screening).filter(Screening.id == screening_id).first()
         if screening:
             screening.results = results
             screening.total_candidates = len(results)
             screening.status = "completed"
-            # ✅ Only deduct credit on SUCCESS
-            user = db.query(User).filter(User.id == screening.user_id).first()
+
+            # Deduct credit on success only
+            user = db.query(User).filter(
+                User.id == screening.user_id
+            ).first()
+
             if user and user.screening_credits > 0:
                 user.screening_credits -= 1
-                
-            db.commit()
+                db.commit()
+
+                # ✅ Update Google Sheets with new credit balance
+                try:
+                    from services.sheets_service import update_user_in_sheet
+                    update_user_in_sheet(
+                        email=user.email,
+                        credits=user.screening_credits,
+                        plan=user.plan,
+                        increment_screenings=True
+                    )
+                except Exception as e:
+                    print(f"Sheet update failed: {e}", flush=True)
+            else:
+                db.commit()
+
             print(f"✅ Screening {screening_id} completed!", flush=True)
 
     except Exception as e:
         print(f"❌ Background screening failed: {e}", flush=True)
-        screening = db.query(Screening).filter(Screening.id == screening_id).first()
+        screening = db.query(Screening).filter(
+            Screening.id == screening_id
+        ).first()
         if screening:
             screening.status = "failed"
             db.commit()
