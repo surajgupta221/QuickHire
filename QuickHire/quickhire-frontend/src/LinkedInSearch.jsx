@@ -180,7 +180,7 @@ export default function LinkedInSearch() {
                         )}
                       </div>
                     </div>
-                    
+                    <a
                       href={p.linkedin_url}
                       target="_blank"
                       rel="noopener noreferrer"
