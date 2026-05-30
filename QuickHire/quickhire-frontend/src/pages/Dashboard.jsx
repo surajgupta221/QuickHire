@@ -85,6 +85,10 @@ export default function Dashboard() {
             className="bg-blue-900 hover:bg-blue-800 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2">
             ➕ New Screening
           </button>
+          <button onClick={() => navigate('/linkedin-search')}
+            className="bg-blue-700 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold transition-all">
+            🔍 Find Candidates
+          </button>
         </div>
 
         {/* Screenings List */}

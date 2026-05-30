@@ -1,5 +1,6 @@
 import sys
 import os
+from routers import auth, screening, payment, linkedin
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 print("Python version:", sys.version, flush=True)
@@ -36,6 +37,8 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(screening.router)
 app.include_router(payment.router)
+app.include_router(linkedin.router)
+
 
 @app.get("/", tags=["Health"])
 def home():
