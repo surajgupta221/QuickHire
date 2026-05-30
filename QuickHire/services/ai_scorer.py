@@ -213,6 +213,8 @@ def _validate_result(result: dict, candidate_name: str,
             f"{candidate_name} has been evaluated against the job requirements. "
             f"Please review the detailed breakdown above. "
             f"Consider scheduling an interview to assess further."
+            f" Final recommendation is {result.get('recommendation', 'Maybe')}."
+            f" Note: This is an automated assessment and should be used as one of multiple factors in the hiring decision process."
         )
     return result
 
@@ -241,6 +243,7 @@ def _error_result(candidate_name: str, error: str) -> dict:
             f"Automated evaluation could not complete for {candidate_name}. "
             f"Please retry the screening process. "
             f"If the issue persists, contact support."
+            f"Must ensure resume is properly formatted and API services are operational."
         )
     }
 
