@@ -23,7 +23,7 @@ export default function LinkedInSearch() {
   const handleSearch = async (e) => {
     e.preventDefault();
     setLoading(true); setError('');
-    console.log('LinkedIn search request', {
+    console.log('LinkedIn search clicked', {
       job_title: form.job_title,
       location: form.location,
       must_have_skills: form.must_have_skills,
