@@ -10,6 +10,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const token = localStorage.getItem('token');
+  const handleSearch = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    console.log("LinkedIn Custom X-ray search triggered!");
+    // Your search logic integration code will sit right here later
+  };
 
   useEffect(() => {
     // Fetch fresh user data from server
@@ -48,6 +53,7 @@ export default function Dashboard() {
             className="bg-blue-700 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold transition-all">
             🔍 Find Candidates
           </button>
+          <button onClick={handleSearch}>Search Candidate</button>
           <span className="text-blue-200 text-sm">
             👤 {user.full_name} |
             🎯 Credits: <strong className="text-white">{user.screening_credits}</strong> |
