@@ -20,6 +20,11 @@ export default function LinkedInSearch() {
     num_results: 10
   });
 
+  const handleSearch = (e) => {
+  if (e && e.preventDefault) e.preventDefault();
+  console.log("LinkedIn Custom Search triggered inside LinkedInSearch panel!");
+
+
   const handleSearch = async (e) => {
     e.preventDefault();
     setLoading(true); setError('');
@@ -239,4 +244,4 @@ export default function LinkedInSearch() {
       </div>
     </div>
   );
-}
+}}
