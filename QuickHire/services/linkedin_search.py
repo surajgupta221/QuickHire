@@ -83,7 +83,7 @@ def search_linkedin_profiles(
         data = response.json()
 
         if "error" in data:
-            logger.error("Google CSE response error: %s", data["error"])
+            logger.error("Google CSE response has error: %s", data["error"])
             return {
                 "error": data["error"].get("message", "Search failed"),
                 "profiles": [],
