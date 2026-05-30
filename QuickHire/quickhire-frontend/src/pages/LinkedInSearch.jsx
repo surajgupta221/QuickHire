@@ -245,7 +245,7 @@ export default function LinkedInSearch() {
                 onClick={openGoogleSearch}
                 disabled={!form.job_title}
                 className="px-6 py-3 border-2 border-blue-900 text-blue-900 rounded-lg font-semibold hover:bg-blue-50 transition-all disabled:opacity-50">
-                🔗 Manual Google Search
+                🔗 X-Ray Search
               </button>
               <button
                 type="submit"
