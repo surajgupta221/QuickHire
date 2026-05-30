@@ -6,14 +6,7 @@ import AutoLogout from '../components/AutoLogout';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export default function LinkedInSearch() {
-  return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <h1 className="text-2xl font-bold text-blue-900">LinkedIn Search</h1>
-      <p className="mt-2 text-gray-600">Find candidates from LinkedIn.</p>
-    </div>
-  );
-}
-{
+
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
   const [loading, setLoading] = useState(false);
@@ -76,6 +69,13 @@ export default function LinkedInSearch() {
   };
 
   return (
+    <div className="min-h-screen bg-gray-50 p-6">
+      <h1 className="text-2xl font-bold text-blue-900">LinkedIn Search</h1>
+      <p className="mt-2 text-gray-600">Find candidates from LinkedIn.</p>
+    </div>
+  );
+}
+{(
     <div className="min-h-screen bg-gray-50">
       <AutoLogout />
       <nav className="bg-blue-900 text-white px-6 py-4 flex items-center gap-4 shadow-lg">
