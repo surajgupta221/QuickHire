@@ -21,11 +21,11 @@ function App() {
         <Route path="/" element={<Navigate to={token ? "/dashboard" : "/login"} />} />
         <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-        <Route path="/linkedin-search" element={<PrivateRoute><LinkedInSearch /></PrivateRoute>} />
         <Route path="/new-screening" element={<PrivateRoute><NewScreening /></PrivateRoute>} />
         <Route path="/results/:id" element={<PrivateRoute><Results /></PrivateRoute>} />
         <Route path="/pricing" element={<PrivateRoute><Pricing /></PrivateRoute>} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/linkedin-search" element={<PrivateRoute><LinkedInSearch /></PrivateRoute>} />
       </Routes>
     </BrowserRouter>
   );

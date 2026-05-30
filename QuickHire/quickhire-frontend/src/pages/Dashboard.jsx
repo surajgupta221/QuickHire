@@ -51,9 +51,9 @@ export default function Dashboard() {
         <div className="flex items-center gap-4">
           <button onClick={() => navigate('/linkedin-search')}
             className="bg-blue-700 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold transition-all">
-            🔍 Find Candidates
+            🔍 Search Candidates
           </button>
-          <button onClick={handleSearch}>Search Candidate</button>
+          <button onClick={handleSearch}>Search</button>
           <span className="text-blue-200 text-sm">
             👤 {user.full_name} |
             🎯 Credits: <strong className="text-white">{user.screening_credits}</strong> |
