@@ -41,13 +41,13 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navbar */}
-      <button onClick={() => navigate('/linkedin-search')}
-            className="bg-blue-700 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold transition-all">
-            🔍 Find Candidates
-          </button>
       <nav className="bg-blue-900 text-white px-6 py-4 flex justify-between items-center shadow-lg">
         <h1 className="text-xl font-bold">⚡ QuickHire</h1>
         <div className="flex items-center gap-4">
+          <button onClick={() => navigate('/linkedin-search')}
+            className="bg-blue-700 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold transition-all">
+            🔍 Find Candidates
+          </button>
           <span className="text-blue-200 text-sm">
             👤 {user.full_name} |
             🎯 Credits: <strong className="text-white">{user.screening_credits}</strong> |
