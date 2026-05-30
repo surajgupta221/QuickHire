@@ -22,17 +22,33 @@ export default function LinkedInSearch() {
   const handleSearch = async (e) => {
     e.preventDefault();
     setLoading(true); setError('');
+    console.log('LinkedIn search request', {
+      job_title: form.job_title,
+      location: form.location,
+      must_have_skills: form.must_have_skills,
+      good_to_have_skills: form.good_to_have_skills,
+      num_results: form.num_results
+    });
+
     try {
       const res = await axios.get(`${API_URL}/linkedin/search`, {
         params: { ...form, token }
       });
+      console.log('LinkedIn search response', res.data);
       setResults(res.data);
     } catch (err) {
+      console.error('LinkedIn search error', err);
       setError(err.response?.data?.detail || 'Search failed');
     } finally { setLoading(false); }
   };
 
   const getXrayQuery = async () => {
+    console.log('Requesting X-Ray query', {
+      job_title: form.job_title,
+      location: form.location,
+      must_have_skills: form.must_have_skills,
+      good_to_have_skills: form.good_to_have_skills
+    });
     try {
       const res = await axios.get(`${API_URL}/linkedin/xray-query`, {
         params: {
@@ -43,8 +59,10 @@ export default function LinkedInSearch() {
           token
         }
       });
+      console.log('X-Ray query response', res.data);
       window.open(res.data.google_search_url, '_blank');
     } catch (err) {
+      console.error('X-Ray query error', err);
       setError('Failed to generate query');
     }
   };

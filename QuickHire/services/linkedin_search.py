@@ -1,7 +1,10 @@
+import logging
 import requests
 import os
 import re
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def build_xray_query(job_title: str, location: str = "",
@@ -29,6 +32,7 @@ def build_xray_query(job_title: str, location: str = "",
             or_skills = ' OR '.join([f'"{s}"' for s in skills[:2]])
             query += f' ({or_skills})'
 
+    logger.info("Built X-Ray query: %s", query)
     return query
 
 
@@ -44,7 +48,13 @@ def search_linkedin_profiles(
     api_key = os.getenv("GOOGLE_SEARCH_API_KEY")
     cx = os.getenv("GOOGLE_SEARCH_ENGINE_ID")
 
+    logger.info(
+        "Starting LinkedIn profile search: job_title=%s location=%s must_have=%s good_to_have=%s num_results=%s",
+        job_title, location, must_have_skills, good_to_have_skills, num_results
+    )
+
     if not api_key or not cx:
+        logger.error("Google Search API not configured: GOOGLE_SEARCH_API_KEY or GOOGLE_SEARCH_ENGINE_ID missing")
         return {
             "error": "Google Search API not configured",
             "profiles": [],
@@ -73,6 +83,7 @@ def search_linkedin_profiles(
         data = response.json()
 
         if "error" in data:
+            logger.error("Google CSE response error: %s", data["error"])
             return {
                 "error": data["error"].get("message", "Search failed"),
                 "profiles": [],
@@ -81,6 +92,7 @@ def search_linkedin_profiles(
 
         profiles = []
         items = data.get("items", [])
+        logger.info("Google CSE returned %d items", len(items))
 
         for item in items:
             link = item.get("link", "")

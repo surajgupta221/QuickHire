@@ -5,8 +5,8 @@ import io
 
 def export_results_to_excel(job_title: str, results: list) -> bytes:
     """
-    Export screening results to a formatted Excel file
-    Returns bytes that can be downloaded
+    Export screening results to a formatted Excel file after screening is complete.
+    Returns bytes that can be downloaded as an .xlsx file.
     """
     wb = openpyxl.Workbook()
     ws = wb.active

@@ -1,10 +1,15 @@
 import sys
 import os
+import logging
 from routers import auth, screening, payment, linkedin
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-print("Python version:", sys.version, flush=True)
-print("Starting QuickHire...", flush=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logging.info("Python version: %s", sys.version)
+logging.info("Starting QuickHire...")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,9 +21,9 @@ from routers import auth, screening, payment
 # Create tables
 try:
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created!", flush=True)
+    logging.info("✅ Database tables created!")
 except Exception as e:
-    print(f"❌ Table creation error: {e}", flush=True)
+    logging.error("❌ Table creation error: %s", e)
 
 app = FastAPI(
     title=settings.APP_NAME,
