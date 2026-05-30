@@ -55,6 +55,14 @@ export default function LinkedInSearch() {
       must_have_skills: form.must_have_skills,
       good_to_have_skills: form.good_to_have_skills
     });
+    // Simple structural string builder fallback
+      let query = "site:://linkedin.com ";
+      if (title) query += `"${title}" `;
+      if (location) query += `"${location}" `;
+      if (skills) query += `"${skills}"`;
+    
+      return query.trim();
+    
     try {
       const res = await axios.get(`${API_URL}/linkedin/xray-query`, {
         params: {
@@ -65,6 +73,7 @@ export default function LinkedInSearch() {
           token
         }
       });
+      
       console.log('X-Ray query response', res.data);
       window.open(res.data.google_search_url, '_blank');
     } catch (err) {
